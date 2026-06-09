@@ -159,11 +159,18 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     ])
     # S17
     test_mention = _avg([1.0 if _contains_any(m, _TEST_TOKENS) else 0.0 for m in user_msgs])
-    # S9
+    # S9: thinks_before_prompt_sec_avg.
+    # Cap each (assistant -> next user) gap at ``_IDLE_CAP_SEC`` so an overnight
+    # session left open (12h+ between turns) doesn't drag the average into the
+    # hours. Pauses longer than the cap are interpreted as "user walked away"
+    # rather than "user is thinking deeply", consistent with how engaged session
+    # duration is computed above in ``_engaged_session_seconds``.
     gaps: list[float] = []
     for prev, nxt in zip(turns, turns[1:]):
         if prev.assistant and nxt.user:
-            gaps.append((nxt.user.ts - prev.assistant.ts).total_seconds())
+            raw = (nxt.user.ts - prev.assistant.ts).total_seconds()
+            if raw > 0:
+                gaps.append(min(raw, _IDLE_CAP_SEC))
     thinks_avg = _avg(gaps)
 
     all_tool_calls = [c for t in turns for c in t.tool_calls]

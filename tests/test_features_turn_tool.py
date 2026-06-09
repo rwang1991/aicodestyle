@@ -79,3 +79,35 @@ def test_engaged_duration_caps_long_idle_gaps(tmp_path: Path):
 
 def test_engaged_duration_helper_returns_zero_for_empty_turns():
     assert _engaged_session_seconds([]) == 0.0
+
+
+def test_thinks_before_prompt_caps_long_gaps(tmp_path: Path):
+    """The 'think time before next prompt' average must not be inflated by a
+    user who leaves the Copilot CLI open overnight (12h gap between turns).
+    Each inter-turn gap is capped at the 5-minute idle threshold, matching the
+    same cap used for engaged session duration."""
+    events_text = textwrap.dedent(
+        """\
+        {"type":"session.start","ts":"2026-06-09T09:00:00Z","data":{"sessionId":"s","startTime":"2026-06-09T09:00:00Z","context":{"cwd":"."},"copilotVersion":"x"}}
+        {"type":"user.message","ts":"2026-06-09T09:00:01Z","data":{"content":"first"}}
+        {"type":"assistant.turn_start","ts":"2026-06-09T09:00:02Z","data":{"turnId":"t1","interactionId":"i1"}}
+        {"type":"assistant.message","ts":"2026-06-09T09:00:10Z","data":{"messageId":"m1","model":"m","content":"done","toolRequests":[],"turnId":"t1"}}
+        {"type":"assistant.turn_end","ts":"2026-06-09T09:00:11Z","data":{"turnId":"t1"}}
+        {"type":"user.message","ts":"2026-06-09T21:00:10Z","data":{"content":"second after lunch+afternoon"}}
+        {"type":"assistant.turn_start","ts":"2026-06-09T21:00:11Z","data":{"turnId":"t2","interactionId":"i2"}}
+        {"type":"assistant.message","ts":"2026-06-09T21:00:15Z","data":{"messageId":"m2","model":"m","content":"ok","toolRequests":[],"turnId":"t2"}}
+        {"type":"assistant.turn_end","ts":"2026-06-09T21:00:16Z","data":{"turnId":"t2"}}
+        """
+    )
+    events = tmp_path / "events.jsonl"
+    events.write_text(events_text, encoding="utf-8")
+    discovered = DiscoveredSession(
+        client="copilot-cli", session_id="s", root=tmp_path,
+        events_path=events, db_path=None, mtime=events.stat().st_mtime,
+    )
+    f = extract_session_features(CopilotCliCollector().parse(discovered))
+    # The raw gap between assistant turn 1 end and user turn 2 is 12h ~= 43200s;
+    # capped at 300s. With only one gap the average is 300s. Without the cap
+    # the average would be 43200s, blowing past the 60s normalizer and forcing
+    # a falsely-high planning score.
+    assert f.thinks_before_prompt_sec_avg == 300.0
