@@ -109,6 +109,42 @@ def _is_accept_and_go(text: str) -> bool:
     return stripped in _ACCEPT_TOKENS
 
 
+# Inter-event gaps longer than this are treated as idle time and excluded from
+# the engaged session duration. Copilot CLI sessions can stay open for hours
+# while the user is at lunch, in a meeting, asleep, etc. Without capping, a
+# typical user accrues thousands of "hours" of engagement that they never
+# actually spent driving the AI.
+_IDLE_CAP_SEC = 300.0  # 5 minutes
+
+
+def _engaged_session_seconds(turns: list, idle_cap: float = _IDLE_CAP_SEC) -> float:
+    """Sum inter-event gaps within a session, capping each gap at ``idle_cap``.
+
+    This approximates "time the user was actively engaging with the assistant"
+    rather than wall-clock duration. A session with two events four hours
+    apart contributes ``min(4h, idle_cap)`` seconds to the total.
+    """
+    times: list = []
+    for t in turns:
+        if t.user is not None:
+            times.append(t.user.ts)
+        if t.assistant is not None:
+            times.append(t.assistant.ts)
+        for c in t.tool_calls:
+            times.append(c.ts_start)
+            times.append(c.ts_end)
+    if len(times) < 2:
+        return 0.0
+    times.sort()
+    engaged = 0.0
+    for prev, curr in zip(times, times[1:]):
+        delta = (curr - prev).total_seconds()
+        if delta <= 0:
+            continue
+        engaged += min(delta, idle_cap)
+    return engaged
+
+
 def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     turns = session.turns
     user_msgs = _user_messages(turns)
@@ -136,7 +172,7 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
 
     accept_and_go = _avg([1.0 if (t.user and _is_accept_and_go(t.user.content)) else 0.0 for t in turns])
     revision_depth = (len(all_tool_calls) / len(turns)) if turns else 0.0
-    duration = (session.ended_at - session.started_at).total_seconds()
+    duration = _engaged_session_seconds(turns)
     tool_error_rate = (
         sum(1 for c in all_tool_calls if not c.success) / len(all_tool_calls)
         if all_tool_calls else 0.0

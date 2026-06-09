@@ -116,7 +116,7 @@ def test_majority_test_files_detects_windows_backslash_paths():
         client="copilot-cli",
         session_id="s-win-tests",
         started_at=ts0,
-        ended_at=ts0 + timedelta(minutes=10),  # > 300s avoids QUICK_TASK
+        ended_at=ts0 + timedelta(minutes=10),
         turns=[
             Turn(
                 index=0,
@@ -135,6 +135,16 @@ def test_majority_test_files_detects_windows_backslash_paths():
                         duration_ms=10,
                         ts_start=ts0 + timedelta(seconds=3),
                         ts_end=ts0 + timedelta(seconds=4),
+                    ),
+                    # Second edit pushed out so engaged duration > 300s and the
+                    # session escapes the QUICK_TASK classification rule.
+                    ToolCall(
+                        tool_name="edit",
+                        arguments={"path": r"src\tests\test_login.py"},
+                        success=True,
+                        duration_ms=10,
+                        ts_start=ts0 + timedelta(minutes=6),
+                        ts_end=ts0 + timedelta(minutes=6, seconds=1),
                     ),
                 ],
                 aborted=False,

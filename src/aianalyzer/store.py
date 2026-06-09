@@ -8,8 +8,10 @@ import duckdb
 
 from aianalyzer.features import SessionFeatures
 
-# Bump whenever SessionFeatures shape changes meaningfully.
-SCHEMA_VERSION = 4
+# Bump whenever SessionFeatures shape OR meaningful semantics change.
+# v5: session_duration_sec switched from wall-clock to engaged-time
+#     (gaps > 5 minutes are treated as idle).
+SCHEMA_VERSION = 5
 
 
 class FeatureStore:
