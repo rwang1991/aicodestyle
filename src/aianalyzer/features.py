@@ -9,6 +9,7 @@ from typing import Iterable
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from aianalyzer.classifier.session_types import SessionType, classify_session_type
 from aianalyzer.normalize import NormalizedSession, Turn
 
 _PLANNING_TOKENS = (
@@ -67,6 +68,7 @@ class SessionFeatures(BaseModel):
     started_hour_local: int = 0
     started_weekday: int = 0
     models_used: dict[str, int] = Field(default_factory=dict)
+    session_type: SessionType = SessionType.MIXED
 
 
 def _user_messages(turns: Iterable[Turn]) -> list[str]:
@@ -225,6 +227,67 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         t.assistant.model for t in turns if t.assistant
     ))
 
+    # P8: session_type classifier integration (Task 24)
+    # Keyword vocabularies for the session-type classifier
+    DEBUG_KW = ("error", "exception", "traceback", "stack trace", "fail", "bug", "crash")
+    TEST_KW = ("test", "spec", "pytest", "unittest", "jest")
+    DOC_EXTS = (".md", ".rst", ".txt")
+    REFACTOR_KW = ("refactor", "rename", "cleanup", "tidy", "extract")
+    REVIEW_KW = ("review", "look at", "what do you think", "feedback")
+    PLAN_KW = ("plan", "design", "approach", "strategy", "outline")
+
+    def _density(text: str, vocab: tuple[str, ...]) -> float:
+        if not text:
+            return 0.0
+        low = text.lower()
+        words = max(len(text.split()), 1)
+        return sum(low.count(kw) for kw in vocab) / words
+
+    all_user_text = " ".join(t.user.content for t in turns if t.user and t.user.content)
+    debug_kw_density = _density(all_user_text, DEBUG_KW)
+    refactor_kw_density = _density(all_user_text, REFACTOR_KW)
+    review_kw_density = _density(all_user_text, REVIEW_KW)
+    planning_language = _density(all_user_text, PLAN_KW)
+
+    # question_ratio and test_or_spec_mention_rate already computed earlier
+    # (variables `question` and `test_mention`)
+
+    def _is_test_path(p: str) -> bool:
+        low = p.lower()
+        return (
+            "/test" in low
+            or low.startswith("test")
+            or low.endswith(("_test.py", ".spec.ts", ".spec.js", ".test.ts", ".test.js"))
+        )
+
+    def _is_doc_path(p: str) -> bool:
+        return p.lower().endswith(DOC_EXTS)
+
+    paths = file_paths_touched
+    majority_test_files = bool(paths) and sum(_is_test_path(p) for p in paths) / len(paths) >= 0.5
+    majority_doc_files = bool(paths) and sum(_is_doc_path(p) for p in paths) / len(paths) >= 0.5
+
+    edit_tool_calls = tool_counts.get("edit", 0) + tool_counts.get("str_replace_editor", 0)
+    create_tool_calls = tool_counts.get("create", 0) + tool_counts.get("write", 0)
+
+    session_type = classify_session_type(
+        turns=len(turns),
+        duration_seconds=duration,
+        tool_error_rate=tool_error_rate,
+        debug_kw_density=debug_kw_density,
+        test_or_spec_mention_rate=test_mention,
+        majority_test_files=majority_test_files,
+        majority_doc_files=majority_doc_files,
+        planning_language=planning_language,
+        todos_count=len(session.todos),
+        edited_files_per_turn=edited_avg,
+        question_ratio=question,
+        refactor_kw_density=refactor_kw_density,
+        review_kw_density=review_kw_density,
+        edit_tool_calls=edit_tool_calls,
+        create_tool_calls=create_tool_calls,
+    )
+
     return SessionFeatures(
         session_id=session.session_id,
         client=session.client,
@@ -255,6 +318,7 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         started_hour_local=started_hour_local,
         started_weekday=started_weekday,
         models_used=models_used_dict,
+        session_type=session_type,
     )
 
 
