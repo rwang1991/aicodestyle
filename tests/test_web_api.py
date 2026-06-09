@@ -34,6 +34,38 @@ def test_scan_then_profile_end_to_end(tmp_path, monkeypatch):
     assert "planning" in p["axes"]
     assert "control" in p["axes"]
 
+    # Radar chart payload: 4 archetypes, scores clamped to [0, 1], labels
+    # exactly matching the public-facing names.
+    aff = p["archetype_affinity"]
+    assert [a["key"] for a in aff] == ["architect", "pilot", "tinkerer", "vibe-coder"]
+    assert [a["label"] for a in aff] == ["Architect", "Pilot", "Tinkerer", "Vibe Coder"]
+    for a in aff:
+        assert 0.0 <= a["score"] <= 1.0
+
+
+def test_archetype_affinity_projects_quadrant_corners(tmp_path, monkeypatch):
+    """The radar projection: a point at the dominant archetype's corner
+    should score 1.0 there and 0.0 at the opposite archetype. We exercise
+    the helper directly so the test doesn't depend on a fully-populated
+    feature store."""
+    from aianalyzer.web import services
+
+    # Architect corner (+1, +1) -> Architect 1.0, opposite Vibe Coder 0.
+    by_key = {a["key"]: a["score"] for a in services._archetype_affinity(1.0, 1.0)}
+    assert by_key["architect"] == 1.0
+    assert by_key["vibe-coder"] == 0.0
+    assert by_key["pilot"] == 0.0  # planning+, but control sign opposes
+    assert by_key["tinkerer"] == 0.0
+
+    # Vibe Coder corner (-1, -1).
+    by_key = {a["key"]: a["score"] for a in services._archetype_affinity(-1.0, -1.0)}
+    assert by_key["vibe-coder"] == 1.0
+    assert by_key["architect"] == 0.0
+
+    # Origin -> everyone zero.
+    by_key = {a["key"]: a["score"] for a in services._archetype_affinity(0.0, 0.0)}
+    assert all(v == 0.0 for v in by_key.values())
+
 
 def test_jobs_returns_404_for_unknown_id():
     client = TestClient(create_app())

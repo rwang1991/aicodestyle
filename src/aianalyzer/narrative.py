@@ -60,10 +60,17 @@ def generate_narrative(
         "--output-format", "text",
     ]
     try:
+        # ``text=True`` alone falls back to the OS locale codepage on Windows
+        # (cp1252 / cp936 / ...), which mangles em-dashes, smart quotes and
+        # CJK characters that the Copilot CLI emits as UTF-8. Force UTF-8 and
+        # replace any malformed sequences so we never propagate mojibake to
+        # the portal.
         proc = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout_sec,
             check=False,
         )

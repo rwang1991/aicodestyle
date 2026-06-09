@@ -10,81 +10,127 @@
   <header class="topbar">
     <div class="brand">AIAnalyzer</div>
     <div class="actions">
-      <button id="scan-btn">Scan sessions</button>
-      <button id="narrate-btn">Generate AI profile</button>
+      <button id="scan-btn" title="Re-discover and re-parse all session files on disk.">Scan sessions</button>
+      <button id="narrate-btn" class="primary" title="Ask the local Copilot CLI to write a personalised AI Profile narrative from the statistics on this page.">Generate AI profile</button>
     </div>
   </header>
 
   <main id="app">
-    <section id="hero" class="card">
-      <h1 id="hero-archetype">Loading your profile…</h1>
-      <p id="hero-summary"></p>
-      <div id="hero-tags" class="tags"></div>
-      <div id="hero-axes" class="axes"></div>
+    <section id="hero" class="card hero-card">
+      <div class="hero-text">
+        <div class="hero-eyebrow">Your AI archetype</div>
+        <h1 id="hero-archetype">Loading your profile…</h1>
+        <p id="hero-summary"></p>
+        <div id="hero-tags" class="tags"></div>
+        <div id="hero-axes" class="axes"></div>
+      </div>
+      <div class="hero-radar">
+        <canvas id="chart-archetype-radar" aria-label="Archetype affinity radar"></canvas>
+        <div class="hero-radar-caption">
+          Affinity to each of the four archetypes, projected from your
+          planning and control axes (1.0 = pure archetype).
+        </div>
+      </div>
     </section>
 
-    <section class="grid">
-      <div class="card kpi" id="kpi-sessions"><h3>Sessions</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-turns"><h3>Turns</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-hours"><h3>Hours</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-days"><h3>Active days</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-streak"><h3>Longest streak</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-avg-turns"><h3>Avg turns/session</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-avg-min"><h3>Avg session min</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-avg-prompt"><h3>Avg prompt (words)</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-median-prompt"><h3>Median prompt</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-p90-prompt"><h3>P90 prompt</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-acceptance"><h3>Acceptance</h3><div class="big">–</div></div>
-      <div class="card kpi" id="kpi-firstseen"><h3>First seen</h3><div class="big">–</div></div>
+    <section id="narrative-section" class="card narrative-card">
+      <header class="narrative-header">
+        <div>
+          <div class="card-eyebrow">AI-generated profile</div>
+          <h2>Your personalised story</h2>
+          <p class="narrative-help">
+            Click <b>Generate AI profile</b> in the header to have the local
+            Copilot CLI write a warm 250-400 word narrative explaining your
+            archetype, habits and 2–3 concrete suggestions to grow. Runs offline
+            against your already-cached data; no telemetry is sent.
+          </p>
+        </div>
+        <button id="narrate-btn-inline" class="primary big">Generate AI profile</button>
+      </header>
+      <div id="narrative-status" class="muted"></div>
+      <article id="narrative-md" class="narrative-body"></article>
     </section>
+
+    <section class="grid" id="kpi-grid"></section>
 
     <section class="charts">
-      <div class="card"><h3>Session types</h3><canvas id="chart-session-types"></canvas></div>
-      <div class="card"><h3>Top tools</h3><canvas id="chart-top-tools"></canvas></div>
-      <div class="card chart-wide"><h3>Activity (last 90 days)</h3><canvas id="chart-activity"></canvas></div>
-      <div class="card"><h3>Time of day</h3><canvas id="chart-hour"></canvas></div>
-      <div class="card"><h3>Day of week</h3><canvas id="chart-weekday"></canvas></div>
+      <div class="card">
+        <h3>Session types</h3>
+        <p class="card-sub">How often each session falls into each work category (debugging, exploration, etc.). Computed from a keyword + tool classifier on each session.</p>
+        <canvas id="chart-session-types"></canvas>
+      </div>
+      <div class="card">
+        <h3>Top tools <span class="unit">(uses)</span></h3>
+        <p class="card-sub">Total invocations per tool across all sessions. Read/edit/bash heavy = hands-on coding; web_search heavy = research.</p>
+        <canvas id="chart-top-tools"></canvas>
+      </div>
+      <div class="card chart-wide">
+        <h3>Activity <span class="unit">(sessions / day, last 90 days)</span></h3>
+        <p class="card-sub">Daily session count over the past 90 days. Gaps indicate quiet days.</p>
+        <canvas id="chart-activity"></canvas>
+      </div>
+      <div class="card">
+        <h3>Time of day <span class="unit">(sessions / hour, local)</span></h3>
+        <p class="card-sub">When in the day you start sessions. Tall morning bars = early bird; tall evening bars = night owl.</p>
+        <canvas id="chart-hour"></canvas>
+      </div>
+      <div class="card">
+        <h3>Day of week <span class="unit">(sessions)</span></h3>
+        <p class="card-sub">Which weekdays you actually code with AI. Sparse Sat/Sun = healthy work boundaries.</p>
+        <canvas id="chart-weekday"></canvas>
+      </div>
     </section>
 
     <section class="tables">
-      <div class="card"><h3>Top projects</h3><ol id="top-projects"></ol></div>
-      <div class="card"><h3>Top models</h3><ol id="top-models"></ol></div>
-      <div class="card"><h3>Top file types</h3><ol id="top-exts"></ol></div>
+      <div class="card">
+        <h3>Top projects <span class="unit">(sessions)</span></h3>
+        <p class="card-sub">Working directories you visit the most.</p>
+        <ol id="top-projects"></ol>
+      </div>
+      <div class="card">
+        <h3>Top models <span class="unit">(turns)</span></h3>
+        <p class="card-sub">Models you actually use, weighted by turn count. xhigh = highest reasoning effort.</p>
+        <ol id="top-models"></ol>
+      </div>
+      <div class="card">
+        <h3>Top file types <span class="unit">(files touched)</span></h3>
+        <p class="card-sub">Extensions of files you read or edit. <code>.md</code>-heavy = docs / specs first.</p>
+        <ol id="top-exts"></ol>
+      </div>
     </section>
 
     <section class="behavior">
       <div class="card behavior-card">
         <h3>Behavior signals</h3>
         <p class="behavior-help">
-          The raw measurements behind your archetype. Bars show each signal vs
-          the 100% point used by the classifier; modifiers fire when you cross
-          their threshold.
+          The raw measurements behind your archetype. Each bar shows your value
+          relative to the 100% point used by the classifier; modifier tags fire
+          when you cross their threshold.
         </p>
         <div class="behavior-cols">
           <div>
             <h4>Planning axis inputs</h4>
+            <p class="card-sub">Higher bars push you toward Architect / Pilot (the "+" planning side).</p>
             <ul id="behavior-planning" class="signal-list"></ul>
           </div>
           <div>
             <h4>Control axis inputs</h4>
+            <p class="card-sub">Higher bars push you toward Architect / Tinkerer (the "hands-on" control side).</p>
             <ul id="behavior-control" class="signal-list"></ul>
           </div>
           <div>
             <h4>Other signals</h4>
+            <p class="card-sub">Inputs used for modifier tags rather than the main axes.</p>
             <ul id="behavior-other" class="signal-list"></ul>
             <h4 class="effort-heading">Reasoning effort mix</h4>
+            <p class="card-sub">Share of turns at each reasoning level. xhigh = most deliberate.</p>
             <ul id="behavior-effort" class="signal-list compact"></ul>
           </div>
         </div>
         <h4 class="modifier-heading">Modifier checks</h4>
+        <p class="card-sub">Side traits layered on top of your archetype. Each one fires only when its signal crosses the threshold.</p>
         <ul id="behavior-modifiers" class="modifier-list"></ul>
       </div>
-    </section>
-
-    <section id="narrative-section" class="card hidden">
-      <h2>Your AI Profile</h2>
-      <div id="narrative-status"></div>
-      <article id="narrative-md"></article>
     </section>
   </main>
 

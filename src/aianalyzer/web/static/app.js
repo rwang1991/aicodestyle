@@ -36,9 +36,11 @@
     const primary = (p.primary_archetype || "unknown").replace(/^./, c => c.toUpperCase());
     $("#hero-archetype").textContent = `You are an ${primary}`;
     const conf = Math.round((p.confidence || 0) * 100);
+    const eb = $(".hero-eyebrow");
+    if (eb) eb.textContent = p.macro_label || "Your AI archetype";
     $("#hero-summary").textContent =
-      `${p.macro_label || primary} · ${conf}% confidence · ${p.totals.sessions} sessions, ` +
-      `${p.totals.turns} turns, ${pretty(p.totals.hours)}h tracked.`;
+      `${conf}% confidence · ${p.totals.sessions} sessions · ` +
+      `${p.totals.turns} turns · ${pretty(p.totals.hours)}h engaged with AI.`;
 
     const tagsEl = $("#hero-tags");
     tagsEl.innerHTML = "";
@@ -50,31 +52,166 @@
 
     const axesEl = $("#hero-axes");
     axesEl.innerHTML = "";
-    const AXIS_LABEL = { planning: "Planning", control: "Control" };
-    for (const [k, label] of Object.entries(AXIS_LABEL)) {
+    const AXIS_META = {
+      planning: {
+        label: "Planning",
+        help: "How much you plan, spec or todo-ify work before coding. " +
+          "Positive = you think before you type; negative = you ask AI to act first.",
+      },
+      control: {
+        label: "Control",
+        help: "How hands-on you stay while the AI works. Positive = you " +
+          "drive the tools yourself; negative = you let the AI run.",
+      },
+    };
+    for (const [k, meta] of Object.entries(AXIS_META)) {
       const v = p.axes?.[k];
       if (v == null) continue;
       const div = document.createElement("div");
       div.className = `axis ${v >= 0 ? "pos" : "neg"}`;
-      div.innerHTML = `<div class="name">${label}</div><div class="value">${v >= 0 ? "+" : ""}${v.toFixed(2)}</div>`;
+      div.title = meta.help;
+      div.innerHTML = `
+        <div class="name">${meta.label}</div>
+        <div class="value">${v >= 0 ? "+" : ""}${v.toFixed(2)}</div>
+        <div class="axis-sub">${v >= 0 ? "leaning positive" : "leaning negative"}</div>
+      `;
       axesEl.appendChild(div);
     }
+
+    renderArchetypeRadar(p);
   }
 
+  function renderArchetypeRadar(p) {
+    destroyChart("chart-archetype-radar");
+    const aff = p.archetype_affinity || [];
+    if (!aff.length) return;
+    const labels = aff.map(a => a.label);
+    const data = aff.map(a => a.score);
+    charts["chart-archetype-radar"] = new Chart($("#chart-archetype-radar"), {
+      type: "radar",
+      data: {
+        labels,
+        datasets: [{
+          label: "Affinity (0–1)",
+          data,
+          backgroundColor: "rgba(88,166,255,0.25)",
+          borderColor: "#58a6ff",
+          borderWidth: 2,
+          pointBackgroundColor: "#58a6ff",
+          pointRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.label}: ${(ctx.parsed.r * 100).toFixed(0)}%`,
+            },
+          },
+        },
+        scales: {
+          r: {
+            angleLines: { color: "rgba(154,164,175,0.25)" },
+            grid: { color: "rgba(154,164,175,0.2)" },
+            pointLabels: { color: "#e6edf3", font: { size: 13, weight: "600" } },
+            ticks: {
+              backdropColor: "transparent",
+              color: "#9aa4af",
+              stepSize: 0.25,
+              callback: (v) => `${Math.round(v * 100)}%`,
+            },
+            min: 0,
+            max: 1,
+          },
+        },
+      },
+    });
+  }
+
+  // KPI metadata: every card declares its label, unit, tooltip and how to
+  // extract the value from the /api/profile payload. Add a new card by
+  // pushing one entry — no HTML edit required.
+  const KPI_CARDS = [
+    {
+      id: "sessions", label: "Sessions", unit: "sessions",
+      get: p => p.totals.sessions,
+      help: "Total number of AI coding sessions ever recorded across all collectors.",
+    },
+    {
+      id: "turns", label: "Turns", unit: "user prompts",
+      get: p => p.totals.turns,
+      help: "Number of user prompts you have sent. One turn = one round-trip with the AI.",
+    },
+    {
+      id: "hours", label: "Engaged time", unit: "hours",
+      get: p => pretty(p.totals.hours),
+      help: "Sum of time you were actively interacting. Gaps longer than 5 min count as a break, not engagement, so this excludes overnight idle.",
+    },
+    {
+      id: "days", label: "Active days", unit: "days",
+      get: p => p.totals.days_active,
+      help: "Distinct calendar days on which you ran at least one AI session.",
+    },
+    {
+      id: "streak", label: "Longest streak", unit: "consecutive days",
+      get: p => p.totals.longest_streak_days,
+      help: "Longest run of consecutive days with at least one session — your most disciplined stretch.",
+    },
+    {
+      id: "avg-turns", label: "Avg turns / session", unit: "turns",
+      get: p => pretty(p.averages.turns_per_session),
+      help: "How long your average session is, in user prompts. High = deep work sessions; low = quick one-shot questions.",
+    },
+    {
+      id: "avg-min", label: "Avg session length", unit: "minutes (engaged)",
+      get: p => pretty(p.averages.session_minutes),
+      help: "Average engaged minutes per session (gaps > 5 min skipped). The real coding time, not wall-clock.",
+    },
+    {
+      id: "avg-prompt", label: "Avg prompt length", unit: "words",
+      get: p => pretty(p.averages.prompt_words),
+      help: "Mean word count of your prompts. High = you give context-rich instructions; low = terse commands.",
+    },
+    {
+      id: "median-prompt", label: "Median prompt length", unit: "words",
+      get: p => pretty(p.averages.median_prompt_words),
+      help: "Median word count of your prompts. Less affected by occasional long specs than the average.",
+    },
+    {
+      id: "p90-prompt", label: "P90 prompt length", unit: "words",
+      get: p => pretty(p.averages.p90_prompt_words),
+      help: "90th percentile prompt length — what your longest 10% of prompts look like.",
+    },
+    {
+      id: "acceptance", label: "Acceptance rate", unit: "% of suggestions",
+      get: p => (p.averages.acceptance_rate * 100).toFixed(0) + "%",
+      help: "Share of AI tool calls / edits you accept (no abort, no rework). Low = you push back a lot; high = you trust the AI's output.",
+    },
+    {
+      id: "firstseen", label: "First session", unit: "date",
+      get: p => p.first_session_at ? new Date(p.first_session_at).toLocaleDateString() : "–",
+      help: "Date of your earliest recorded AI session across all collectors.",
+    },
+  ];
+
   function renderKpis(p) {
-    $("#kpi-sessions .big").textContent = p.totals.sessions;
-    $("#kpi-turns .big").textContent = p.totals.turns;
-    $("#kpi-hours .big").textContent = pretty(p.totals.hours);
-    $("#kpi-days .big").textContent = p.totals.days_active;
-    $("#kpi-streak .big").textContent = p.totals.longest_streak_days;
-    $("#kpi-avg-turns .big").textContent = pretty(p.averages.turns_per_session);
-    $("#kpi-avg-min .big").textContent = pretty(p.averages.session_minutes);
-    $("#kpi-avg-prompt .big").textContent = pretty(p.averages.prompt_words);
-    $("#kpi-median-prompt .big").textContent = pretty(p.averages.median_prompt_words);
-    $("#kpi-p90-prompt .big").textContent = pretty(p.averages.p90_prompt_words);
-    $("#kpi-acceptance .big").textContent = (p.averages.acceptance_rate * 100).toFixed(0) + "%";
-    const firstSeen = p.first_session_at ? new Date(p.first_session_at).toLocaleDateString() : "–";
-    $("#kpi-firstseen .big").textContent = firstSeen;
+    const grid = $("#kpi-grid");
+    grid.innerHTML = "";
+    for (const card of KPI_CARDS) {
+      const div = document.createElement("div");
+      div.className = "card kpi";
+      div.title = card.help;
+      div.innerHTML = `
+        <h3>${card.label}</h3>
+        <div class="big">${card.get(p)}</div>
+        <div class="unit">${card.unit}</div>
+        <div class="kpi-help">${card.help}</div>
+      `;
+      grid.appendChild(div);
+    }
   }
 
   function renderLists(p) {
@@ -198,6 +335,22 @@
     }
   }
 
+  // Plain-English explanation for each signal name.
+  const SIGNAL_HELP = {
+    planning_language_ratio: "Share of your prompts that contain planning words like 'plan', 'design', 'spec', 'first'.",
+    test_or_spec_mentions: "Average number of times each prompt mentions tests, specs or requirements.",
+    todo_density: "Average number of explicit TODO items you create per session.",
+    revision_depth: "How many follow-up turns you typically spend refining a single thread.",
+    question_ratio: "Share of prompts containing a question mark or starting with a question word.",
+    thinks_before_prompt_sec_avg: "Mean idle seconds between AI replies and your next prompt (capped at 5 min to ignore breaks).",
+    tool_diversity: "Distinct tool types you invoke per session — bigger = you reach for many tools.",
+    edited_files_per_turn: "Average number of files touched per user turn.",
+    accept_and_go_rate: "Share of turns where you ship the AI's first response without revisions.",
+    tool_error_rate: "Share of tool calls that returned an error.",
+    parallel_tool_call_rate: "Share of turns issuing more than one tool call in parallel.",
+    abort_rate: "Share of tool calls you aborted mid-flight.",
+  };
+
   function renderBehavior(p) {
     const behavior = p.behavior || {};
     const renderSignalList = (selector, signals) => {
@@ -215,12 +368,14 @@
         } else {
           pct = Math.max(0, Math.min(1, sig.value || 0));
         }
+        const help = SIGNAL_HELP[sig.name] || "";
         li.innerHTML = `
           <div class="signal-row">
-            <span class="signal-name">${sig.label}</span>
+            <span class="signal-name" title="${help}">${sig.label}</span>
             <span class="signal-value">${(sig.value ?? 0).toFixed(2)}${scaleNote}</span>
           </div>
           <div class="signal-bar"><div class="signal-fill" style="width:${(pct * 100).toFixed(0)}%"></div></div>
+          ${help ? `<div class="signal-help">${help}</div>` : ""}
         `;
         ul.appendChild(li);
       }
@@ -311,14 +466,18 @@
   }
 
   async function wireNarrative() {
-    const btn = $("#narrate-btn");
-    btn.addEventListener("click", async () => {
-      const section = $("#narrative-section");
+    const buttons = [$("#narrate-btn"), $("#narrate-btn-inline")].filter(Boolean);
+    if (!buttons.length) return;
+    const section = $("#narrative-section");
+
+    const run = async () => {
       const status = $("#narrative-status");
+      // Section is now always visible; just refresh in-place.
       section.classList.remove("hidden");
+      section.classList.add("loading");
       status.textContent = "Asking copilot CLI to write your profile… (this can take 1–3 minutes)";
       $("#narrative-md").innerHTML = "";
-      btn.disabled = true;
+      for (const b of buttons) b.disabled = true;
       try {
         const { job_id } = await fetchJson("/api/narrative/start", { method: "POST" });
         const final = await pollJob(job_id, (j) => {
@@ -333,9 +492,12 @@
       } catch (e) {
         status.textContent = `Narrative request failed: ${e.message}`;
       } finally {
-        btn.disabled = false;
+        for (const b of buttons) b.disabled = false;
+        section.classList.remove("loading");
       }
-    });
+    };
+
+    for (const btn of buttons) btn.addEventListener("click", run);
   }
 
   async function load() {

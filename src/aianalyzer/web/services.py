@@ -61,6 +61,38 @@ def _confidence(planning: float, control: float) -> float:
     return min(1.0, (abs(planning) + abs(control)) / 2.0)
 
 
+# Ideal direction of each archetype in (planning, control) space.
+# Used to project a user's score onto each quadrant.
+_ARCHETYPE_DIRECTIONS: list[tuple[str, str, int, int]] = [
+    ("architect", "Architect", +1, +1),
+    ("pilot", "Pilot", +1, -1),
+    ("tinkerer", "Tinkerer", -1, +1),
+    ("vibe-coder", "Vibe Coder", -1, -1),
+]
+
+
+def _archetype_affinity(planning: float, control: float) -> list[dict[str, Any]]:
+    """Project (planning, control) onto each of the 4 archetype quadrants.
+
+    Score formula: ``alignment = (sign_p * P + sign_c * C) / 2``, clamped to
+    ``[0, 1]``. The dominant archetype reaches 1.0 when the user's point sits
+    exactly at the (+/- 1, +/- 1) corner of that quadrant; the opposite
+    archetype always reads 0.0. This is what the radar chart on the portal
+    consumes.
+    """
+    out: list[dict[str, Any]] = []
+    for key, label, sp, sc in _ARCHETYPE_DIRECTIONS:
+        score = (sp * planning + sc * control) / 2.0
+        out.append(
+            {
+                "key": key,
+                "label": label,
+                "score": round(max(0.0, min(1.0, score)), 3),
+            }
+        )
+    return out
+
+
 def _signal_value(profile: UserProfile, name: str) -> float:
     """Mirror of ``classifier.rules._signal_value`` for portal display.
 
@@ -179,6 +211,9 @@ def load_profile_payload() -> dict[str, Any]:
             "planning": round(classification.planning_score, 3),
             "control": round(classification.control_score, 3),
         },
+        "archetype_affinity": _archetype_affinity(
+            classification.planning_score, classification.control_score
+        ),
         "totals": {
             "sessions": ext.total_sessions,
             "turns": ext.total_turns,

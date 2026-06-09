@@ -56,6 +56,10 @@ def test_generate_narrative_invokes_copilot_with_expected_args(monkeypatch):
     assert "-s" in captured["cmd"]
     assert "--output-format" in captured["cmd"]
     assert "text" in captured["cmd"]
+    # Critical for Windows: subprocess must decode as UTF-8 with replace so
+    # we never produce mojibake from the OS code page (e.g. cp1252 / cp936).
+    assert captured["kwargs"].get("encoding") == "utf-8"
+    assert captured["kwargs"].get("errors") == "replace"
 
 
 def test_generate_narrative_raises_on_nonzero_exit(monkeypatch):
