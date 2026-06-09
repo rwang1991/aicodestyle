@@ -1,6 +1,8 @@
 """Per-session feature extraction. All 18 signals from DESIGN.md §6."""
 from __future__ import annotations
 
+import math
+from collections import Counter
 from datetime import datetime
 from statistics import mean
 from typing import Iterable
@@ -18,6 +20,11 @@ _QUESTION_PREFIXES = (
     "can", "could", "should", "would",
 )
 _TEST_TOKENS = ("test", "spec", "tdd", "pytest", "unit test", "fixture")
+_ACCEPT_TOKENS = {
+    "yes", "ok", "okay", "go", "proceed", "continue",
+    "do it", "ship it", "sounds good", "looks good", "lgtm",
+}
+_EDIT_TOOL_NAMES = {"edit", "create", "write"}
 
 
 class SessionFeatures(BaseModel):
@@ -73,6 +80,24 @@ def _avg(values: list[float]) -> float:
     return float(mean(values)) if values else 0.0
 
 
+def _shannon_entropy(counts: list[int]) -> float:
+    total = sum(counts)
+    if total == 0:
+        return 0.0
+    entropy = 0.0
+    for c in counts:
+        if c == 0:
+            continue
+        p = c / total
+        entropy -= p * math.log(p)
+    return entropy
+
+
+def _is_accept_and_go(text: str) -> bool:
+    stripped = text.strip().lower().rstrip(".!?,")
+    return stripped in _ACCEPT_TOKENS
+
+
 def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     turns = session.turns
     user_msgs = _user_messages(turns)
@@ -94,6 +119,33 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
             gaps.append((nxt.user.ts - prev.assistant.ts).total_seconds())
     thinks_avg = _avg(gaps)
 
+    all_tool_calls = [c for t in turns for c in t.tool_calls]
+    tool_name_counts = Counter(c.tool_name for c in all_tool_calls)
+    tool_diversity = _shannon_entropy(list(tool_name_counts.values()))
+
+    accept_and_go = _avg([1.0 if (t.user and _is_accept_and_go(t.user.content)) else 0.0 for t in turns])
+    revision_depth = (len(all_tool_calls) / len(turns)) if turns else 0.0
+    duration = (session.ended_at - session.started_at).total_seconds()
+    tool_error_rate = (
+        sum(1 for c in all_tool_calls if not c.success) / len(all_tool_calls)
+        if all_tool_calls else 0.0
+    )
+
+    edited_per_turn: list[float] = []
+    for t in turns:
+        paths = {
+            str(c.arguments.get("path"))
+            for c in t.tool_calls
+            if c.tool_name in _EDIT_TOOL_NAMES and c.arguments.get("path")
+        }
+        edited_per_turn.append(float(len(paths)))
+    edited_avg = _avg(edited_per_turn) if turns else 0.0
+
+    parallel_rate = (
+        sum(1 for t in turns if len(t.tool_calls) > 1) / len(turns)
+        if turns else 0.0
+    )
+
     return SessionFeatures(
         session_id=session.session_id,
         client=session.client,
@@ -104,4 +156,11 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         question_ratio=question,
         thinks_before_prompt_sec_avg=thinks_avg,
         test_or_spec_mention_rate=test_mention,
+        tool_diversity=tool_diversity,
+        accept_and_go_ratio=accept_and_go,
+        revision_depth=revision_depth,
+        session_duration_sec=duration,
+        tool_error_rate=tool_error_rate,
+        edited_files_per_turn_avg=edited_avg,
+        parallel_tool_call_rate=parallel_rate,
     )

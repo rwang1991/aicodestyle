@@ -1,0 +1,21 @@
+{"type":"session.start","ts":"2026-06-09T11:00:00Z","data":{"sessionId":"vibe","startTime":"2026-06-09T11:00:00Z","context":{"cwd":"C:/v"},"copilotVersion":"x"}}
+{"type":"user.message","ts":"2026-06-09T11:00:01Z","data":{"content":"build me a todo app"}}
+{"type":"assistant.turn_start","ts":"2026-06-09T11:00:02Z","data":{"turnId":"t1","interactionId":"i1"}}
+{"type":"tool.execution_start","ts":"2026-06-09T11:00:03Z","data":{"toolCallId":"c1","toolName":"create","arguments":{"path":"app.py"},"turnId":"t1"}}
+{"type":"tool.execution_complete","ts":"2026-06-09T11:00:04Z","data":{"toolCallId":"c1","success":true,"model":"m","turnId":"t1"}}
+{"type":"tool.execution_start","ts":"2026-06-09T11:00:04Z","data":{"toolCallId":"c2","toolName":"create","arguments":{"path":"requirements.txt"},"turnId":"t1"}}
+{"type":"tool.execution_complete","ts":"2026-06-09T11:00:05Z","data":{"toolCallId":"c2","success":true,"model":"m","turnId":"t1"}}
+{"type":"assistant.message","ts":"2026-06-09T11:00:06Z","data":{"messageId":"m1","model":"m","content":"done","toolRequests":[],"turnId":"t1"}}
+{"type":"assistant.turn_end","ts":"2026-06-09T11:00:07Z","data":{"turnId":"t1"}}
+{"type":"user.message","ts":"2026-06-09T11:00:10Z","data":{"content":"ok"}}
+{"type":"assistant.turn_start","ts":"2026-06-09T11:00:11Z","data":{"turnId":"t2","interactionId":"i2"}}
+{"type":"tool.execution_start","ts":"2026-06-09T11:00:12Z","data":{"toolCallId":"c3","toolName":"powershell","arguments":{"command":"python app.py"},"turnId":"t2"}}
+{"type":"tool.execution_complete","ts":"2026-06-09T11:00:13Z","data":{"toolCallId":"c3","success":false,"error":"boom","model":"m","turnId":"t2"}}
+{"type":"assistant.message","ts":"2026-06-09T11:00:14Z","data":{"messageId":"m2","model":"m","content":"fix?","toolRequests":[],"turnId":"t2"}}
+{"type":"assistant.turn_end","ts":"2026-06-09T11:00:15Z","data":{"turnId":"t2"}}
+{"type":"user.message","ts":"2026-06-09T11:00:20Z","data":{"content":"go"}}
+{"type":"assistant.turn_start","ts":"2026-06-09T11:00:21Z","data":{"turnId":"t3","interactionId":"i3"}}
+{"type":"tool.execution_start","ts":"2026-06-09T11:00:22Z","data":{"toolCallId":"c4","toolName":"edit","arguments":{"path":"app.py"},"turnId":"t3"}}
+{"type":"tool.execution_complete","ts":"2026-06-09T11:00:23Z","data":{"toolCallId":"c4","success":true,"model":"m","turnId":"t3"}}
+{"type":"assistant.message","ts":"2026-06-09T11:00:24Z","data":{"messageId":"m3","model":"m","content":"done","toolRequests":[],"turnId":"t3"}}
+{"type":"assistant.turn_end","ts":"2026-06-09T11:00:25Z","data":{"turnId":"t3"}}
