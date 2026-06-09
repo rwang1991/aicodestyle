@@ -1,0 +1,5 @@
+{"type":"session.start","ts":"2026-06-09T13:00:00Z","data":{"sessionId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","startTime":"2026-06-09T13:00:00Z","context":{"cwd":"C:/scan"},"copilotVersion":"x"}}
+{"type":"user.message","ts":"2026-06-09T13:00:01Z","data":{"content":"plan before coding"}}
+{"type":"assistant.turn_start","ts":"2026-06-09T13:00:02Z","data":{"turnId":"t1","interactionId":"i1"}}
+{"type":"assistant.message","ts":"2026-06-09T13:00:03Z","data":{"messageId":"m1","model":"m","content":"ok","toolRequests":[],"turnId":"t1"}}
+{"type":"assistant.turn_end","ts":"2026-06-09T13:00:04Z","data":{"turnId":"t1"}}
