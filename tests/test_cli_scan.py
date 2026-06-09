@@ -14,7 +14,7 @@ def test_scan_populates_cache(tmp_path: Path, fixtures_dir: Path):
 
     result = runner.invoke(
         app,
-        ["--home", str(home), "--cache", str(cache)],
+        ["scan", "--home", str(home), "--cache", str(cache)],
     )
     assert result.exit_code == 0, result.output
     assert "scanned" in result.output.lower()
@@ -31,8 +31,8 @@ def test_scan_is_idempotent(tmp_path: Path, fixtures_dir: Path):
     cache = tmp_path / "cache.duckdb"
     runner = CliRunner()
 
-    runner.invoke(app, ["--home", str(home), "--cache", str(cache)])
-    second = runner.invoke(app, ["--home", str(home), "--cache", str(cache)])
+    runner.invoke(app, ["scan", "--home", str(home), "--cache", str(cache)])
+    second = runner.invoke(app, ["scan", "--home", str(home), "--cache", str(cache)])
 
     assert second.exit_code == 0
     assert "skipped" in second.output.lower()

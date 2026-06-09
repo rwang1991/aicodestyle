@@ -5,10 +5,17 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from rich.console import Console
 
+from aianalyzer.classifier.rules import classify
 from aianalyzer.collectors.copilot_cli import CopilotCliCollector
 from aianalyzer.discovery import discover_copilot_cli_sessions
-from aianalyzer.features import extract_session_features
+from aianalyzer.features import (
+    SessionFeatures,
+    aggregate_user_profile,
+    extract_session_features,
+)
+from aianalyzer.report.terminal import render_report
 from aianalyzer.store import FeatureStore
 
 app = typer.Typer(add_completion=False, help="Analyze your AI coding sessions.")
@@ -53,3 +60,44 @@ def scan(
 
     store.close()
     typer.echo(f"scanned {scanned}, skipped {skipped}, errors {errors}")
+
+
+def _collect_cwd_history(home: Path) -> list[str | None]:
+    import json
+
+    base = home / ".copilot" / "session-state"
+    if not base.exists():
+        return []
+    cwds: list[str | None] = []
+    for events in base.glob("*/events.jsonl"):
+        try:
+            with events.open(encoding="utf-8") as fh:
+                first = fh.readline()
+            data = json.loads(first).get("data", {})
+            cwd = data.get("context", {}).get("cwd")
+            cwds.append(cwd)
+        except Exception:  # noqa: BLE001
+            cwds.append(None)
+    return cwds
+
+
+@app.command()
+def report(
+    home: Optional[Path] = typer.Option(None, help="Override the home directory holding .copilot/."),
+    cache: Optional[Path] = typer.Option(None, help="DuckDB cache file."),
+) -> None:
+    """Aggregate cached features and print the archetype report."""
+    home_dir = home or _default_home()
+    cache_path = cache or _default_cache(home_dir)
+
+    store = FeatureStore(cache_path)
+    features: list[SessionFeatures] = list(store.load_all())
+    store.close()
+
+    cwd_history = _collect_cwd_history(home_dir)
+    profile = aggregate_user_profile(features, cwd_history=cwd_history)
+    result = classify(profile)
+
+    console = Console()
+    render_report(profile, result, features, console=console)
+
