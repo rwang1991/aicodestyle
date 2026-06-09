@@ -146,6 +146,41 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         if turns else 0.0
     )
 
+    # S11: model_variety
+    model_variety = len(session.models_used)
+
+    # S12: reasoning_effort_distribution
+    efforts = [
+        t.assistant.reasoning_effort
+        for t in turns
+        if t.assistant and t.assistant.reasoning_effort
+    ]
+    if efforts:
+        counts = Counter(efforts)
+        total = sum(counts.values())
+        reasoning_distribution = {k: v / total for k, v in counts.items()}
+    else:
+        reasoning_distribution = {}
+
+    # S14: command_repetition_rate
+    powershell_cmds = [
+        str(c.arguments.get("command"))
+        for c in all_tool_calls
+        if c.tool_name == "powershell" and c.arguments.get("command") is not None
+    ]
+    if len(powershell_cmds) >= 2:
+        cmd_counts = Counter(powershell_cmds)
+        repeats = sum(c for c in cmd_counts.values() if c > 1)
+        command_repetition = repeats / len(powershell_cmds)
+    else:
+        command_repetition = 0.0
+
+    # S15: todo_count
+    todo_count = len(session.todos)
+
+    # S16: abort_rate
+    abort_rate = _avg([1.0 if t.aborted else 0.0 for t in turns])
+
     return SessionFeatures(
         session_id=session.session_id,
         client=session.client,
@@ -163,4 +198,10 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         tool_error_rate=tool_error_rate,
         edited_files_per_turn_avg=edited_avg,
         parallel_tool_call_rate=parallel_rate,
+        model_variety=model_variety,
+        reasoning_effort_distribution=reasoning_distribution,
+        cwd_switch_count=0,
+        command_repetition_rate=command_repetition,
+        todo_count=todo_count,
+        abort_rate=abort_rate,
     )
