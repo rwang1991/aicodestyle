@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from aianalyzer import narrative as _narrative
 from aianalyzer.web import services
 from aianalyzer.web.jobs import REGISTRY
 
@@ -53,5 +54,17 @@ def create_app() -> FastAPI:
     @app.get("/api/profile")
     def profile() -> dict:
         return services.load_profile_payload()
+
+    @app.post("/api/narrative/start", status_code=202)
+    def start_narrative() -> dict[str, str]:
+        job = REGISTRY.create(kind="narrative")
+
+        def _do(_j):
+            facts = services.load_profile_payload()
+            md = _narrative.generate_narrative(facts)
+            return {"markdown": md}
+
+        REGISTRY.run(job, _do)
+        return {"job_id": job.id}
 
     return app
