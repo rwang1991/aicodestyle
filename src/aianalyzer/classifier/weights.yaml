@@ -1,0 +1,35 @@
+# Axis weights. Positive => pushes toward POSITIVE end of the axis.
+# planning axis: + = Architect/Pilot, - = Tinkerer/Vibe Coder
+# control axis:  + = Architect/Tinkerer (hands-on), - = Pilot/Vibe Coder (hands-off)
+planning:
+  planning_language_ratio: 1.0
+  question_ratio: 0.5
+  thinks_before_prompt_sec_avg: 0.7
+  test_or_spec_mention_rate: 0.6
+  todo_density: 0.8
+control:
+  tool_diversity: 0.6
+  edited_files_per_turn_avg: 0.4
+  accept_and_go_ratio: -1.0
+  revision_depth: -0.3
+  tool_error_rate: 0.2
+
+# Normalizers map raw signal -> [0, 1] via linear clamp.
+normalizers:
+  planning_language_ratio: {min: 0.0, max: 0.6}
+  question_ratio: {min: 0.0, max: 0.6}
+  thinks_before_prompt_sec_avg: {min: 0.0, max: 60.0}
+  test_or_spec_mention_rate: {min: 0.0, max: 0.4}
+  todo_density: {min: 0.0, max: 2.0}
+  tool_diversity: {min: 0.0, max: 2.0}
+  edited_files_per_turn_avg: {min: 0.0, max: 5.0}
+  accept_and_go_ratio: {min: 0.0, max: 0.6}
+  revision_depth: {min: 0.0, max: 4.0}
+  tool_error_rate: {min: 0.0, max: 0.4}
+
+modifiers:
+  questioner_min_question_ratio: 0.4
+  debugger_min_tool_error_rate: 0.2
+  planner_min_todo_density: 1.0
+  yolo_min_accept_and_go: 0.5
+  parallelist_min_parallel_tool_call_rate: 0.3
