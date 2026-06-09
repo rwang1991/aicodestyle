@@ -258,9 +258,11 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         started_hour_local = 0
         started_weekday = 0
 
-    # P7: models_used (dict[str, int] = model → turn count)
+    # P7: models_used (dict[str, int] = model → turn count). Skip empty model
+    # strings, which appear when assistant.message events arrived without a
+    # ``model`` field (mainly the very first turn of older Copilot CLI builds).
     models_used_dict = dict(Counter(
-        t.assistant.model for t in turns if t.assistant
+        t.assistant.model for t in turns if t.assistant and t.assistant.model
     ))
 
     # P8: session_type classifier integration (Task 24)

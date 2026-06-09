@@ -106,6 +106,49 @@ def test_extract_session_features_portal_defaults_when_empty():
     assert sf.models_used == {}
 
 
+def test_models_used_dict_drops_empty_model_strings():
+    """Regression: assistant.message events from early Copilot CLI builds sometimes
+    arrived without a ``model`` field, leaving ``AssistantMessage.model = ""``.
+    Those empty strings leaked into the per-user top_models list as a blank row
+    with a large count. Filter them out at aggregation time."""
+    ts0 = datetime(2026, 6, 10, 14, 30, tzinfo=timezone.utc)
+    ns = NormalizedSession(
+        client="copilot-cli",
+        session_id="s-empty-model",
+        started_at=ts0,
+        ended_at=ts0 + timedelta(minutes=1),
+        turns=[
+            Turn(
+                index=0,
+                user=UserMessage(content="hi", ts=ts0),
+                assistant=AssistantMessage(
+                    turn_id="t0",
+                    content="hello",
+                    model="",  # missing model on the first turn
+                    ts=ts0 + timedelta(seconds=1),
+                ),
+                tool_calls=[],
+                aborted=False,
+            ),
+            Turn(
+                index=1,
+                user=UserMessage(content="ok", ts=ts0 + timedelta(seconds=10)),
+                assistant=AssistantMessage(
+                    turn_id="t1",
+                    content="done",
+                    model="claude-opus-4.7",
+                    ts=ts0 + timedelta(seconds=11),
+                ),
+                tool_calls=[],
+                aborted=False,
+            ),
+        ],
+    )
+    sf = extract_session_features(ns)
+    assert sf.models_used == {"claude-opus-4.7": 1}
+    assert "" not in sf.models_used
+
+
 def test_majority_test_files_detects_windows_backslash_paths():
     """Regression: real Copilot CLI sessions on Windows store paths with backslashes.
     The classifier's _is_test_path must normalize them so TESTING fires correctly."""
