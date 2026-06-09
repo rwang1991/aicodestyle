@@ -40,3 +40,17 @@ def test_has_fresh(tmp_path: Path):
     store.upsert(_sf("a"), mtime=10.0)
     assert store.has_fresh("copilot-cli", "a", mtime=10.0) is True
     assert store.has_fresh("copilot-cli", "a", mtime=11.0) is False
+
+
+def test_store_invalidates_rows_with_older_schema_version(tmp_path: Path):
+    store = FeatureStore(tmp_path / "cache.duckdb")
+
+    sf = _sf(session_id="s1")
+    store.upsert(sf, mtime=1.0)
+
+    # Simulate an older schema version on disk
+    store._con.execute("UPDATE features SET schema_version = schema_version - 1")
+
+    # has_fresh should return False for rows with old schema_version
+    assert store.has_fresh("copilot-cli", "s1", mtime=1.0) is False, \
+        "rows from older schema must be treated as cache miss"
