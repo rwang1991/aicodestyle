@@ -3,10 +3,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from aianalyzer.web import services
+from aianalyzer.web.jobs import REGISTRY
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+class ScanRequest(BaseModel):
+    pass  # reserved for future filters
 
 
 def create_app() -> FastAPI:
@@ -18,5 +26,32 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.post("/api/scan", status_code=202)
+    def start_scan(_: ScanRequest) -> dict[str, str]:
+        job = REGISTRY.create(kind="scan")
+
+        def _do(j):
+            return services.run_scan(progress_cb=lambda p: setattr(j, "progress", p))
+
+        REGISTRY.run(job, _do)
+        return {"job_id": job.id}
+
+    @app.get("/api/jobs/{job_id}")
+    def job_status(job_id: str) -> dict:
+        j = REGISTRY.get(job_id)
+        if j is None:
+            raise HTTPException(404, detail="job not found")
+        return {
+            "id": j.id,
+            "status": j.status,
+            "progress": j.progress,
+            "result": j.result,
+            "error": j.error,
+        }
+
+    @app.get("/api/profile")
+    def profile() -> dict:
+        return services.load_profile_payload()
 
     return app
