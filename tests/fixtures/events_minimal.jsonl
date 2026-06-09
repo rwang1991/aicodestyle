@@ -1,0 +1,6 @@
+{"type":"session.start","ts":"2026-06-09T10:00:00Z","data":{"sessionId":"11111111-2222-3333-4444-555555555555","startTime":"2026-06-09T10:00:00Z","context":{"cwd":"C:/work/proj"},"copilotVersion":"1.0.60"}}
+{"type":"session.model_change","ts":"2026-06-09T10:00:01Z","data":{"newModel":"claude-opus-4.7-xhigh","reasoningEffort":"xhigh"}}
+{"type":"user.message","ts":"2026-06-09T10:00:05Z","data":{"content":"Please plan the refactor."}}
+{"type":"assistant.turn_start","ts":"2026-06-09T10:00:06Z","data":{"turnId":"t-1","interactionId":"i-1"}}
+{"type":"assistant.message","ts":"2026-06-09T10:00:08Z","data":{"messageId":"m-1","model":"claude-opus-4.7-xhigh","content":"Here is the plan.","toolRequests":[],"interactionId":"i-1","turnId":"t-1"}}
+{"type":"assistant.turn_end","ts":"2026-06-09T10:00:09Z","data":{"turnId":"t-1"}}
