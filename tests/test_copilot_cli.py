@@ -79,6 +79,38 @@ def test_collector_pairs_tool_start_with_complete(tmp_path: Path):
     assert calls[0].success is True
 
 
+def test_collector_normalizes_non_dict_arguments(tmp_path: Path):
+    """Real copilot CLI emits tools (e.g. apply_patch) whose ``arguments`` is a
+    raw string. The collector must coerce it into a dict so ToolCall validates
+    and downstream ``arguments.get(...)`` lookups stay safe.
+    """
+    events_text = textwrap.dedent(
+        """\
+        {"type":"session.start","ts":"2026-06-09T10:00:00Z","data":{"sessionId":"s","startTime":"2026-06-09T10:00:00Z","context":{"cwd":"."},"copilotVersion":"x"}}
+        {"type":"user.message","ts":"2026-06-09T10:00:01Z","data":{"content":"go"}}
+        {"type":"assistant.turn_start","ts":"2026-06-09T10:00:02Z","data":{"turnId":"t1","interactionId":"i1"}}
+        {"type":"tool.execution_start","ts":"2026-06-09T10:00:03Z","data":{"toolCallId":"c1","toolName":"apply_patch","arguments":"*** Begin Patch\\n*** Add File: hi.py\\n*** End Patch","turnId":"t1"}}
+        {"type":"tool.execution_complete","ts":"2026-06-09T10:00:04Z","data":{"toolCallId":"c1","success":true,"model":"m","turnId":"t1"}}
+        {"type":"assistant.message","ts":"2026-06-09T10:00:05Z","data":{"messageId":"m1","model":"m","content":"done","toolRequests":[],"turnId":"t1"}}
+        {"type":"assistant.turn_end","ts":"2026-06-09T10:00:06Z","data":{"turnId":"t1"}}
+        """
+    )
+    events = tmp_path / "events.jsonl"
+    events.write_text(events_text, encoding="utf-8")
+    discovered = DiscoveredSession(
+        client="copilot-cli", session_id="s", root=tmp_path,
+        events_path=events, db_path=None, mtime=events.stat().st_mtime,
+    )
+    session = CopilotCliCollector().parse(discovered)
+    calls = session.turns[0].tool_calls
+    assert len(calls) == 1
+    assert calls[0].tool_name == "apply_patch"
+    assert isinstance(calls[0].arguments, dict)
+    assert "Begin Patch" in calls[0].arguments["_raw"]
+    # Downstream code that does .get("path") must return None, not crash.
+    assert calls[0].arguments.get("path") is None
+
+
 def test_collector_aborted_turn_flagged(tmp_path: Path):
     events_text = textwrap.dedent(
         """\

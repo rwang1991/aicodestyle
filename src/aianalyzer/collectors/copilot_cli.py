@@ -128,9 +128,17 @@ class CopilotCliCollector:
                 call_id = data.get("toolCallId")
                 if not call_id:
                     continue
+                raw_args = data.get("arguments")
+                if isinstance(raw_args, dict):
+                    args = raw_args
+                elif raw_args in (None, ""):
+                    args = {}
+                else:
+                    # Some tools (e.g. apply_patch) emit raw string payloads.
+                    args = {"_raw": str(raw_args)}
                 current_calls[call_id] = {
                     "tool_name": data.get("toolName") or "unknown",
-                    "arguments": data.get("arguments") or {},
+                    "arguments": args,
                     "ts_start": ts,
                 }
             elif etype == "tool.execution_complete":
