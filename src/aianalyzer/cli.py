@@ -11,8 +11,13 @@ import typer
 from rich.console import Console
 
 from aianalyzer.classifier.rules import classify
+from aianalyzer.collectors.base import Collector
 from aianalyzer.collectors.copilot_cli import CopilotCliCollector
-from aianalyzer.discovery import discover_copilot_cli_sessions
+from aianalyzer.collectors.vscode_copilot import VsCodeCopilotCollector
+from aianalyzer.discovery import (
+    discover_copilot_cli_sessions,
+    discover_vscode_copilot_sessions,
+)
 from aianalyzer.features import (
     SessionFeatures,
     aggregate_user_profile,
@@ -22,6 +27,12 @@ from aianalyzer.report.terminal import render_report
 from aianalyzer.store import FeatureStore
 
 app = typer.Typer(add_completion=False, help="Analyze your AI coding sessions.")
+
+
+_COLLECTORS: dict[str, Collector] = {
+    "copilot-cli": CopilotCliCollector(),
+    "vscode-copilot": VsCodeCopilotCollector(),
+}
 
 
 def _default_home() -> Path:
@@ -37,18 +48,31 @@ def scan(
     home: Optional[Path] = typer.Option(None, help="Override the home directory holding .copilot/."),
     cache: Optional[Path] = typer.Option(None, help="DuckDB cache file."),
 ) -> None:
-    """Discover and ingest local Copilot CLI sessions."""
+    """Discover and ingest local AI coding sessions (Copilot CLI + VS Code Copilot Chat)."""
     home_dir = home or _default_home()
     cache_path = cache or _default_cache(home_dir)
 
     discovered = list(discover_copilot_cli_sessions(home=home_dir))
-    store = FeatureStore(cache_path)
-    collector = CopilotCliCollector()
+    # VS Code uses OS-specific user-data dirs (AppData/Library/.config) that
+    # we never re-root from --home. So when a user explicitly overrides --home
+    # (typically for tests or scratch sandboxes) we keep the scan scoped to
+    # just the Copilot CLI dir and skip VS Code entirely. Real users don't
+    # pass --home, so they still get everything.
+    if home is None:
+        discovered += list(discover_vscode_copilot_sessions())
 
+    store = FeatureStore(cache_path)
+    by_client: dict[str, int] = {}
     scanned = 0
     skipped = 0
     errors = 0
     for d in discovered:
+        by_client[d.client] = by_client.get(d.client, 0) + 1
+        collector = _COLLECTORS.get(d.client)
+        if collector is None:
+            errors += 1
+            typer.echo(f"unknown client {d.client} for {d.session_id}", err=True)
+            continue
         try:
             if store.has_fresh(d.client, d.session_id, d.mtime):
                 skipped += 1
@@ -62,7 +86,10 @@ def scan(
             typer.echo(f"error in {d.session_id}: {exc}", err=True)
 
     store.close()
-    typer.echo(f"scanned {scanned}, skipped {skipped}, errors {errors}")
+    breakdown = ", ".join(f"{c}={n}" for c, n in sorted(by_client.items())) or "no clients"
+    typer.echo(
+        f"scanned {scanned}, skipped {skipped}, errors {errors} (sources: {breakdown})"
+    )
 
 
 def _collect_cwd_history(home: Path) -> list[str | None]:

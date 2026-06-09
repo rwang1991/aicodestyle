@@ -137,6 +137,33 @@ def test_scan_job_reports_failure_on_discovery_error(tmp_path, monkeypatch):
     assert "disk on fire" in j["error"]
 
 
+def test_scan_result_exposes_supported_clients_and_breakdown(tmp_path, monkeypatch):
+    """The empty-state UI relies on supported_clients + by_client in the scan
+    job result so it can tell users which clients we looked at and which ones
+    found data."""
+    monkeypatch.setenv("AIANALYZER_CACHE_DIR", str(tmp_path))
+    from aianalyzer.web import services
+
+    monkeypatch.setattr(services, "discover_all_sessions", lambda: [])
+    client = TestClient(create_app())
+    r = client.post("/api/scan", json={})
+    job_id = r.json()["job_id"]
+
+    deadline = time.time() + 5
+    j = None
+    while time.time() < deadline:
+        j = client.get(f"/api/jobs/{job_id}").json()
+        if j["status"] in ("done", "failed"):
+            break
+        time.sleep(0.05)
+    assert j and j["status"] == "done"
+    result = j["result"]
+    assert result["discovered"] == 0
+    assert result["by_client"] == {}
+    assert "copilot-cli" in result["supported_clients"]
+    assert "vscode-copilot" in result["supported_clients"]
+
+
 def _stub_profile(monkeypatch):
     from aianalyzer.web import services
 

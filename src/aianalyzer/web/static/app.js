@@ -9,12 +9,61 @@
     window.marked.use({ renderer: { html() { return ""; } } });
   }
 
-  function toast(msg, kind = "error") {
+  function toast(msg, kind = "error", durationMs = 5000) {
     const el = document.createElement("div");
     el.className = `toast ${kind}`;
+    // Preserve newlines for multi-line empty-state messages.
+    el.style.whiteSpace = "pre-line";
     el.textContent = msg;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 5000);
+    setTimeout(() => el.remove(), durationMs);
+  }
+
+  const CLIENT_LABELS = {
+    "copilot-cli": "GitHub Copilot CLI",
+    "vscode-copilot": "VS Code Copilot Chat",
+    "claude-code": "Claude Code",
+    "codex-cli": "Codex CLI",
+  };
+
+  function humanizeClient(c) {
+    return CLIENT_LABELS[c] || c;
+  }
+
+  function formatBreakdown(byClient) {
+    if (!byClient || typeof byClient !== "object") return "";
+    const parts = Object.entries(byClient)
+      .map(([c, n]) => `${n} ${humanizeClient(c)}`);
+    return parts.join(", ");
+  }
+
+  function renderEmptyState(result) {
+    // Inject a one-time banner in the hero summary so the empty state is
+    // visible after the toast disappears. Idempotent.
+    const summary = $("#hero-summary");
+    if (!summary) return;
+    let banner = document.getElementById("empty-state-banner");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "empty-state-banner";
+      banner.className = "empty-state-banner";
+      summary.parentNode.insertBefore(banner, summary.nextSibling);
+    }
+    const supported = (result.supported_clients || []).map(humanizeClient);
+    banner.innerHTML = `
+      <strong>No sessions found yet.</strong>
+      AIAnalyzer looked for AI coding sessions in these locations:
+      <ul>
+        <li><code>~/.copilot/session-state/</code> &mdash; GitHub Copilot CLI</li>
+        <li><code>%APPDATA%/Code/User/workspaceStorage/&lt;workspace&gt;/chatSessions/</code> &mdash; VS Code Copilot Chat</li>
+      </ul>
+      <p><strong>Supported clients:</strong> ${supported.join(", ") || "(none configured)"}.</p>
+      <p><strong>Not yet supported</strong> (no persistent on-disk log we can read):
+      Visual Studio IDE Copilot Chat, Claude Code, Codex CLI.</p>
+      <p>If you use one of the supported clients but still see zero, make sure you've
+      had at least one chat session there since installing the tool, then click
+      <em>Scan sessions</em> again.</p>
+    `;
   }
 
   async function fetchJson(url, opts) {
@@ -500,7 +549,25 @@
         if (final.status === "failed") {
           toast(`Scan failed: ${final.error}`);
         } else {
-          toast(`Scanned ${final.result.discovered} (new ${final.result.new})`, "info");
+          const r = final.result || {};
+          const total = r.discovered ?? 0;
+          const fresh = r.new ?? 0;
+          if (total === 0) {
+            // Build a clear empty-state message so users don't see a silent "0".
+            const supported = (r.supported_clients || []).map(humanizeClient).join(", ");
+            const longMsg =
+              `Scan finished. We looked for sessions from: ${supported || "supported clients"}, ` +
+              `but found 0 on disk.\n\n` +
+              `Locations checked:\n` +
+              `  • GitHub Copilot CLI: ~/.copilot/session-state/\n` +
+              `  • VS Code Copilot Chat: AppData/Roaming/Code/User/workspaceStorage/<workspace>/chatSessions/\n\n` +
+              `Not supported (no persistent on-disk log): Visual Studio IDE Copilot Chat, Claude Code, Codex CLI.`;
+            toast(longMsg, "warn", 12000);
+            renderEmptyState(r);
+          } else {
+            const breakdown = formatBreakdown(r.by_client);
+            toast(`Scanned ${total} session${total === 1 ? "" : "s"} (new ${fresh}) — ${breakdown}`, "info");
+          }
           await load();
         }
       } catch (e) {
@@ -555,6 +622,13 @@
       renderLists(profile);
       renderCharts(profile);
       renderBehavior(profile);
+      // First-launch empty state: show banner when cache is empty.
+      const banner = document.getElementById("empty-state-banner");
+      if (profile && profile.totals && (profile.totals.sessions || 0) === 0) {
+        renderEmptyState({ supported_clients: ["copilot-cli", "vscode-copilot"] });
+      } else if (banner) {
+        banner.remove();
+      }
     } catch (e) {
       toast(`Failed to load profile: ${e.message}`);
     }

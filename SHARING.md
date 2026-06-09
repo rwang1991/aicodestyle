@@ -10,6 +10,25 @@ There are three paths depending on who you are sharing with.
 
 ---
 
+## What gets scanned
+
+AIAnalyzer reads session logs from these AI coding tools on the teammate's
+machine:
+
+| AI tool | Status | Where it reads from |
+| --- | --- | --- |
+| **GitHub Copilot CLI** | ✅ Supported | `~/.copilot/session-state/` |
+| **VS Code — GitHub Copilot Chat** | ✅ Supported | `%APPDATA%\Code\User\workspaceStorage\**\chatSessions\*.json` (and `Code - Insiders`) |
+| Visual Studio IDE — Copilot Chat | ❌ Not supported | Visual Studio does not persist chat history to disk in a parseable form — there is nothing to scan. |
+| Claude Code | ❌ Not yet | Planned: `~/.claude/projects/**/*.jsonl` |
+| Codex CLI | ❌ Not yet | Planned: `~/.codex/sessions/` |
+
+The portal triggers a scan when the teammate clicks **Scan sessions**. If the
+scan returns 0 sessions, the portal explains what it looked for and which
+tools are supported, so the teammate isn't left guessing.
+
+---
+
 ## A. Share with non-developers — the .exe bundle (recommended)
 
 ### 1. Build the bundle (once, on a Windows box with Python 3.11+)
@@ -112,6 +131,10 @@ paths are:
     Deliberator, Multi-tasker)
   - An AI-generated narrative profile (if a Copilot/Codex CLI is on PATH)
   - KPI cards, per-tool breakdown, session classification, behavior signals.
+- A **Scan sessions** button at the top — they must click it once to populate
+  the cache from their disk. If nothing is found (e.g., they only use
+  Visual Studio IDE Copilot, which isn't supported), the portal shows a
+  yellow banner explaining what was scanned and which tools are supported.
 
 All processing is local. No telemetry, no upload.
 

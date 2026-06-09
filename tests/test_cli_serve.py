@@ -33,7 +33,11 @@ def test_serve_advertises_url_and_calls_uvicorn(monkeypatch):
     )
     assert result.exit_code == 0, result.output
     assert "http://127.0.0.1:9999/" in result.output
-    assert captured["target"] == "aianalyzer.web.app:create_app"
+    assert captured["target"] is not None
+    assert callable(captured["target"]), "factory must be passed as object, not string"
+    from aianalyzer.web.app import create_app
+
+    assert captured["target"] is create_app
     assert captured["kwargs"]["host"] == "127.0.0.1"
     assert captured["kwargs"]["port"] == 9999
     assert captured["kwargs"]["factory"] is True

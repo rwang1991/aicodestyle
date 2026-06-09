@@ -7,8 +7,14 @@ from typing import Any, Iterable
 
 from aianalyzer.classifier.rules import classify
 from aianalyzer.classifier.weights import load_weights
+from aianalyzer.collectors.base import Collector
 from aianalyzer.collectors.copilot_cli import CopilotCliCollector
-from aianalyzer.discovery import DiscoveredSession, discover_copilot_cli_sessions
+from aianalyzer.collectors.vscode_copilot import VsCodeCopilotCollector
+from aianalyzer.discovery import (
+    DiscoveredSession,
+    discover_copilot_cli_sessions,
+    discover_vscode_copilot_sessions,
+)
 from aianalyzer.features import UserProfile, aggregate_user_profile, extract_session_features
 from aianalyzer.stats import compute_extended_profile
 from aianalyzer.store import FeatureStore
@@ -42,11 +48,19 @@ _MODIFIER_SPECS: list[tuple[str, str, str]] = [
 
 
 def discover_all_sessions() -> Iterable[DiscoveredSession]:
-    """Aggregator over all supported clients. Currently only copilot-cli.
+    """Aggregator over all supported clients.
 
     Exposed as a module-level symbol so tests can monkeypatch it.
     """
-    return discover_copilot_cli_sessions()
+    yield from discover_copilot_cli_sessions()
+    yield from discover_vscode_copilot_sessions()
+
+
+# Map a client name to the collector used to parse one of its sessions.
+_COLLECTORS: dict[str, Collector] = {
+    "copilot-cli": CopilotCliCollector(),
+    "vscode-copilot": VsCodeCopilotCollector(),
+}
 
 
 def _cache_path() -> Path:
@@ -178,17 +192,24 @@ def _build_behavior_block(profile: UserProfile) -> dict[str, Any]:
     }
 
 
-def run_scan(progress_cb=None) -> dict[str, int]:
-    """Discover -> normalize -> extract -> cache. Returns counts."""
+def run_scan(progress_cb=None) -> dict[str, Any]:
+    """Discover -> normalize -> extract -> cache. Returns counts and per-client breakdown."""
     store = FeatureStore(_cache_path())
     try:
         discovered = list(discover_all_sessions())
-        collector = CopilotCliCollector()
         total = len(discovered)
         scanned = 0
         skipped = 0
         errors = 0
+        # Per-client counts so the UI can show an honest "we found N from X" breakdown.
+        by_client: dict[str, int] = {}
+        for d in discovered:
+            by_client[d.client] = by_client.get(d.client, 0) + 1
         for i, d in enumerate(discovered):
+            collector = _COLLECTORS.get(d.client)
+            if collector is None:
+                errors += 1
+                continue
             try:
                 if store.has_fresh(d.client, d.session_id, d.mtime):
                     skipped += 1
@@ -201,7 +222,14 @@ def run_scan(progress_cb=None) -> dict[str, int]:
                 errors += 1
             if progress_cb:
                 progress_cb((i + 1) / max(total, 1))
-        return {"discovered": total, "new": scanned, "skipped": skipped, "errors": errors}
+        return {
+            "discovered": total,
+            "new": scanned,
+            "skipped": skipped,
+            "errors": errors,
+            "by_client": by_client,
+            "supported_clients": sorted(_COLLECTORS.keys()),
+        }
     finally:
         store.close()
 
