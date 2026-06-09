@@ -53,19 +53,44 @@ def _secondary(planning: float, control: float, margin: float) -> Archetype | No
     return _QUADRANT[(planning >= 0, not (control >= 0))]
 
 
+def _modifiers(profile: UserProfile, w: Weights) -> list[str]:
+    m = w.modifiers
+    tags: list[str] = []
+    if profile.question_ratio >= m["questioner_min_question_ratio"]:
+        tags.append("questioner")
+    if profile.tool_error_rate >= m["debugger_min_tool_error_rate"]:
+        tags.append("debugger")
+    todo_density = profile.total_todos / max(profile.session_count, 1)
+    if todo_density >= m["planner_min_todo_density"]:
+        tags.append("planner")
+    if profile.accept_and_go_ratio >= m["yolo_min_accept_and_go"]:
+        tags.append("yolo")
+    if profile.parallel_tool_call_rate >= m["parallelist_min_parallel_tool_call_rate"]:
+        tags.append("parallelist")
+    return tags
+
+
 def classify(profile: UserProfile, weights: Weights | None = None) -> ClassificationResult:
     w = weights or load_weights()
     planning = _axis_score(profile, w.planning, w)
     control = _axis_score(profile, w.control, w)
     primary = _primary(planning, control)
     secondary = _secondary(planning, control, margin=0.15)
-    label = primary.value.replace("-", " ").title()
+    tags = _modifiers(profile, w)
+
+    primary_label = primary.value.replace("-", " ").title()
+    label = primary_label
+    if secondary is not None:
+        label += f" / {secondary.value.replace('-', ' ').title()}"
+    if tags:
+        label += f" ({', '.join(tags)})"
+
     return ClassificationResult(
         planning_score=planning,
         control_score=control,
         primary=primary,
         secondary=secondary,
-        tags=[],
+        tags=tags,
         macro_label=label,
         secondary_margin=0.15,
     )
