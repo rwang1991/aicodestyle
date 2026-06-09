@@ -253,7 +253,7 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     # (variables `question` and `test_mention`)
 
     def _is_test_path(p: str) -> bool:
-        low = p.lower()
+        low = p.lower().replace("\\", "/")
         return (
             "/test" in low
             or low.startswith("test")

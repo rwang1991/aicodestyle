@@ -104,3 +104,42 @@ def test_extract_session_features_portal_defaults_when_empty():
     assert sf.tool_counts == {}
     assert sf.file_paths_touched == set()
     assert sf.models_used == {}
+
+
+def test_majority_test_files_detects_windows_backslash_paths():
+    """Regression: real Copilot CLI sessions on Windows store paths with backslashes.
+    The classifier's _is_test_path must normalize them so TESTING fires correctly."""
+    from aianalyzer.classifier.session_types import SessionType
+
+    ts0 = datetime(2026, 6, 10, 14, 30, tzinfo=timezone.utc)
+    ns = NormalizedSession(
+        client="copilot-cli",
+        session_id="s-win-tests",
+        started_at=ts0,
+        ended_at=ts0 + timedelta(minutes=10),  # > 300s avoids QUICK_TASK
+        turns=[
+            Turn(
+                index=0,
+                user=UserMessage(content="add coverage for the auth module", ts=ts0),
+                assistant=AssistantMessage(
+                    turn_id="t0",
+                    content="ok",
+                    model="claude-sonnet-4.5",
+                    ts=ts0 + timedelta(seconds=2),
+                ),
+                tool_calls=[
+                    ToolCall(
+                        tool_name="edit",
+                        arguments={"path": r"src\tests\test_auth.py"},
+                        success=True,
+                        duration_ms=10,
+                        ts_start=ts0 + timedelta(seconds=3),
+                        ts_end=ts0 + timedelta(seconds=4),
+                    ),
+                ],
+                aborted=False,
+            ),
+        ],
+    )
+    sf = extract_session_features(ns)
+    assert sf.session_type == SessionType.TESTING
