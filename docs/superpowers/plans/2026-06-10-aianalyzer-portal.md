@@ -40,14 +40,14 @@ def test_store_invalidates_rows_with_older_schema_version(tmp_path):
     store = FeatureStore(db)
 
     sf = _features(session_id="s1")  # reuse existing helper in this file
-    store.upsert("copilot_cli", sf, mtime=1.0)
+    store.upsert(sf, mtime=1.0)
 
     # Simulate an older schema version on disk
-    with store._conn() as conn:
-        conn.execute("UPDATE session_features SET schema_version = schema_version - 1")
+    store._con.execute("UPDATE features SET schema_version = schema_version - 1")
 
-    hit = store.get("copilot_cli", "s1", mtime=1.0)
-    assert hit is None, "rows from older schema must be treated as cache miss"
+    assert store.has_fresh(sf.client, "s1", mtime=1.0) is False, (
+        "rows from older schema must be treated as cache miss"
+    )
 ```
 If `_features` doesn't already exist in `tests/test_store.py`, copy the existing per-file helper used in `tests/test_classifier_primary.py` (`_profile`/`_features` style) and adapt it to build a minimal `SessionFeatures`. Keep it local to the test file.
 
@@ -65,9 +65,9 @@ SCHEMA_VERSION = 2
 ```
 Update the `CREATE TABLE IF NOT EXISTS` DDL inside `FeatureStore.__init__` (or wherever the table is created) to include `schema_version INTEGER NOT NULL`:
 ```python
-conn.execute(
+self._con.execute(
     """
-    CREATE TABLE IF NOT EXISTS session_features (
+    CREATE TABLE IF NOT EXISTS features (
         client          VARCHAR NOT NULL,
         session_id      VARCHAR NOT NULL,
         mtime           DOUBLE  NOT NULL,
@@ -80,11 +80,11 @@ conn.execute(
 ```
 Add a lightweight migration *after* `CREATE TABLE`:
 ```python
-cols = {row[1] for row in conn.execute("PRAGMA table_info('session_features')").fetchall()}
+cols = {row[1] for row in self._con.execute("PRAGMA table_info('features')").fetchall()}
 if "schema_version" not in cols:
-    conn.execute("ALTER TABLE session_features ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0")
+    self._con.execute("ALTER TABLE features ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0")
 ```
-Update `upsert` to write `SCHEMA_VERSION`. Update `get` to require `schema_version = ?` with `SCHEMA_VERSION`. Same for any `get_many` / iterator method.
+Update `upsert` to write `SCHEMA_VERSION`. Update `has_fresh` and `load_all` to require `schema_version = ?` with `SCHEMA_VERSION`. (FeatureStore uses `self._con` as a direct DuckDB connection attribute, the table name is `features`, and the only read methods are `has_fresh` and `load_all` — no `get()` exists.)
 
 - [ ] **Step 4: Run the full store test module**
 
@@ -1226,7 +1226,7 @@ def run_scan(progress_cb=None) -> dict[str, int]:
     total = len(discovered)
     new = 0
     for i, ds in enumerate(discovered):
-        cached = store.get(ds.client, ds.session_id, mtime=ds.mtime)
+        cached = store.has_fresh(ds.client, ds.session_id, mtime=ds.mtime)
         if cached is None:
             ns = normalize_session(ds)
             sf = extract_session_features(ns)
@@ -1239,7 +1239,7 @@ def run_scan(progress_cb=None) -> dict[str, int]:
 
 def load_profile_payload() -> dict[str, Any]:
     store = FeatureStore(_cache_path())
-    features = list(store.iter_all())
+    features = list(store.load_all())
     user_profile = aggregate_user_profile(features)
     classification = classify(user_profile)
     ext = compute_extended_profile(features)
@@ -1277,17 +1277,7 @@ def load_profile_payload() -> dict[str, Any]:
 ```
 NOTE: If `discover_all_sessions` is not the actual symbol used by the MLP CLI, open `src/aianalyzer/collectors/__init__.py` and re-export the discovery function (e.g. `from .copilot_cli import discover_copilot_cli_sessions`, then wrap a `discover_all_sessions` helper). The test stub monkeypatches `services.discover_all_sessions`, so the test still runs even if the real implementation is multi-client.
 
-If `FeatureStore` doesn't yet have `iter_all()`, add it now to `src/aianalyzer/store.py`:
-```python
-def iter_all(self) -> Iterator[SessionFeatures]:
-    with self._conn() as conn:
-        rows = conn.execute(
-            "SELECT json FROM session_features WHERE schema_version = ?",
-            [SCHEMA_VERSION],
-        ).fetchall()
-    for (j,) in rows:
-        yield SessionFeatures.model_validate_json(j)
-```
+`FeatureStore` already exposes `load_all() -> Iterator[SessionFeatures]` which filters by current `SCHEMA_VERSION` (added in Task 22) — no new method is needed.
 
 - [ ] **Step 5: Wire routes in `app.py`**
 
