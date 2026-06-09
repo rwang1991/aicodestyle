@@ -2863,7 +2863,7 @@ git commit -m "feat(report): terminal renderer with archetype panel, signals tab
 Adds a `typer` app exposing `aianalyzer scan`. The command:
 
 1. Resolves the Copilot CLI base directory (`--home <dir>` or `$HOME / .copilot / session-state`).
-2. Discovers sessions via `find_copilot_cli_sessions`.
+2. Discovers sessions via `discover_copilot_cli_sessions(home=...)`.
 3. For each session, skips if `store.has_fresh(...)` returns True; otherwise collects → normalizes → extracts features → upserts into the DuckDB store at `--cache <path>` (default `<home>/.aianalyzer/cache.duckdb`).
 4. Prints a summary: total sessions scanned, skipped (cached), and errors.
 
@@ -2938,7 +2938,7 @@ from typing import Optional
 import typer
 
 from aianalyzer.collectors.copilot_cli import CopilotCliCollector
-from aianalyzer.discovery import find_copilot_cli_sessions
+from aianalyzer.discovery import discover_copilot_cli_sessions
 from aianalyzer.features import extract_session_features
 from aianalyzer.store import FeatureStore
 
@@ -2962,8 +2962,7 @@ def scan(
     home_dir = home or _default_home()
     cache_path = cache or _default_cache(home_dir)
 
-    base = home_dir / ".copilot" / "session-state"
-    discovered = list(find_copilot_cli_sessions(base))
+    discovered = list(discover_copilot_cli_sessions(home=home_dir))
     store = FeatureStore(cache_path)
     collector = CopilotCliCollector()
 
@@ -3239,7 +3238,7 @@ After finishing all tasks above, walk through this checklist before declaring do
 
 1. **Spec coverage** — every signal `S1`–`S18` in `DESIGN.md §6` corresponds to a `SessionFeatures` field populated by Tasks 9–11. Every archetype in `DESIGN.md §7` (`Architect`, `Pilot`, `Tinkerer`, `Vibe Coder`) maps to a `_QUADRANT` entry in Task 16. The five modifier tags listed in §7 all appear in Task 17's `_modifiers`. Every milestone deliverable for M0–M3 in `§12` ships in this plan.
 2. **Placeholder scan** — search the plan for `TODO`, `TBD`, `fill in`, `appropriate`, `similar to`, and confirm none survive in step bodies. Every code step has a complete code block.
-3. **Type consistency** — `SessionFeatures`, `UserProfile`, `ClassificationResult`, `Archetype`, `NormalizedSession`, `Turn`, `ToolCall`, `UserMessage`, `AssistantMessage`, `TodoSnapshot`, and `DiscoveredSession` are spelled identically wherever they appear. Function names `extract_session_features`, `aggregate_user_profile`, `classify`, `load_weights`, `render_report`, `find_copilot_cli_sessions`, and `CopilotCliCollector.parse` are stable across tasks.
+3. **Type consistency** — `SessionFeatures`, `UserProfile`, `ClassificationResult`, `Archetype`, `NormalizedSession`, `Turn`, `ToolCall`, `UserMessage`, `AssistantMessage`, `TodoSnapshot`, and `DiscoveredSession` are spelled identically wherever they appear. Function names `extract_session_features`, `aggregate_user_profile`, `classify`, `load_weights`, `render_report`, `discover_copilot_cli_sessions`, and `CopilotCliCollector.parse` are stable across tasks.
 
 If anything is off, fix it inline before handing off.
 
