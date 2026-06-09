@@ -127,8 +127,13 @@ def serve(
 
         threading.Thread(target=_open, daemon=True).start()
 
+    # Pass the factory as an object (not import string) so the packaged
+    # PyInstaller bundle, which doesn't expose modules by string to Uvicorn's
+    # importer, still works. In development this is equally fine.
+    from aianalyzer.web.app import create_app as _create_app
+
     uvicorn.run(
-        "aianalyzer.web.app:create_app",
+        _create_app,
         host=host,
         port=port,
         factory=True,
