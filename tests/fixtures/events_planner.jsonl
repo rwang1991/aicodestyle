@@ -1,0 +1,13 @@
+{"type":"session.start","ts":"2026-06-09T10:00:00Z","data":{"sessionId":"sp","startTime":"2026-06-09T10:00:00Z","context":{"cwd":"C:/w"},"copilotVersion":"x"}}
+{"type":"user.message","ts":"2026-06-09T10:00:05Z","data":{"content":"Before we code, please plan the architecture and outline tradeoffs."}}
+{"type":"assistant.turn_start","ts":"2026-06-09T10:00:06Z","data":{"turnId":"t1","interactionId":"i1"}}
+{"type":"assistant.message","ts":"2026-06-09T10:00:10Z","data":{"messageId":"m1","model":"m","content":"Plan...","toolRequests":[],"turnId":"t1"}}
+{"type":"assistant.turn_end","ts":"2026-06-09T10:00:10Z","data":{"turnId":"t1"}}
+{"type":"user.message","ts":"2026-06-09T10:00:30Z","data":{"content":"What tests should we write? Add pytest fixtures for the parser."}}
+{"type":"assistant.turn_start","ts":"2026-06-09T10:00:31Z","data":{"turnId":"t2","interactionId":"i2"}}
+{"type":"assistant.message","ts":"2026-06-09T10:00:34Z","data":{"messageId":"m2","model":"m","content":"Tests...","toolRequests":[],"turnId":"t2"}}
+{"type":"assistant.turn_end","ts":"2026-06-09T10:00:34Z","data":{"turnId":"t2"}}
+{"type":"user.message","ts":"2026-06-09T10:00:50Z","data":{"content":"Proceed."}}
+{"type":"assistant.turn_start","ts":"2026-06-09T10:00:51Z","data":{"turnId":"t3","interactionId":"i3"}}
+{"type":"assistant.message","ts":"2026-06-09T10:00:53Z","data":{"messageId":"m3","model":"m","content":"OK","toolRequests":[],"turnId":"t3"}}
+{"type":"assistant.turn_end","ts":"2026-06-09T10:00:53Z","data":{"turnId":"t3"}}
