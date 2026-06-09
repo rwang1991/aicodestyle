@@ -3,6 +3,12 @@
   const charts = {};
   const PALETTE = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#79c0ff", "#56d364", "#e3b341", "#ff7b72", "#bc8cff"];
 
+  // marked v12 dropped the built-in `sanitize` option. Install a renderer that
+  // strips raw HTML so we can safely innerHTML the narrative markdown.
+  if (window.marked && window.marked.use) {
+    window.marked.use({ renderer: { html() { return ""; } } });
+  }
+
   function toast(msg, kind = "error") {
     const el = document.createElement("div");
     el.className = `toast ${kind}`;
@@ -77,7 +83,13 @@
       ol.innerHTML = "";
       for (const [label, count] of items.slice(0, limit)) {
         const li = document.createElement("li");
-        li.innerHTML = `<span class="label">${label}</span><span class="count">${count}</span>`;
+        const labelSpan = document.createElement("span");
+        labelSpan.className = "label";
+        labelSpan.textContent = label;
+        const countSpan = document.createElement("span");
+        countSpan.className = "count";
+        countSpan.textContent = count;
+        li.append(labelSpan, countSpan);
         ol.appendChild(li);
       }
     };
