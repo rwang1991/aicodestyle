@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIAnalyzer — Your AI Profile</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">AIAnalyzer</div>
+    <div class="actions">
+      <button id="scan-btn">Scan sessions</button>
+      <button id="narrate-btn">Generate AI profile</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <section id="hero" class="card">
+      <h1 id="hero-archetype">Loading your profile…</h1>
+      <p id="hero-summary"></p>
+      <div id="hero-tags" class="tags"></div>
+      <div id="hero-axes" class="axes"></div>
+    </section>
+
+    <section class="grid">
+      <div class="card kpi" id="kpi-sessions"><h3>Sessions</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-turns"><h3>Turns</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-hours"><h3>Hours</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-days"><h3>Active days</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-streak"><h3>Longest streak</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-avg-turns"><h3>Avg turns/session</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-avg-min"><h3>Avg session min</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-avg-prompt"><h3>Avg prompt (words)</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-median-prompt"><h3>Median prompt</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-p90-prompt"><h3>P90 prompt</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-acceptance"><h3>Acceptance</h3><div class="big">–</div></div>
+      <div class="card kpi" id="kpi-firstseen"><h3>First seen</h3><div class="big">–</div></div>
+    </section>
+
+    <section class="charts">
+      <div class="card"><h3>Session types</h3><canvas id="chart-session-types"></canvas></div>
+      <div class="card"><h3>Top tools</h3><canvas id="chart-top-tools"></canvas></div>
+      <div class="card chart-wide"><h3>Activity (last 90 days)</h3><canvas id="chart-activity"></canvas></div>
+      <div class="card"><h3>Time of day</h3><canvas id="chart-hour"></canvas></div>
+      <div class="card"><h3>Day of week</h3><canvas id="chart-weekday"></canvas></div>
+    </section>
+
+    <section class="tables">
+      <div class="card"><h3>Top projects</h3><ol id="top-projects"></ol></div>
+      <div class="card"><h3>Top models</h3><ol id="top-models"></ol></div>
+      <div class="card"><h3>Top file types</h3><ol id="top-exts"></ol></div>
+    </section>
+
+    <section id="narrative-section" class="card hidden">
+      <h2>Your AI Profile</h2>
+      <div id="narrative-status"></div>
+      <article id="narrative-md"></article>
+    </section>
+  </main>
+
+  <script src="/static/chart.umd.js"></script>
+  <script src="/static/marked.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

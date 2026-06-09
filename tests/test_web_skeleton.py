@@ -15,3 +15,11 @@ def test_app_serves_static_chart_js():
     r = client.get("/static/chart.umd.js")
     assert r.status_code == 200
     assert "Chart" in r.text
+
+
+def test_root_serves_index_html():
+    client = TestClient(create_app())
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "AIAnalyzer" in r.text
+    assert "chart.umd.js" in r.text
