@@ -22,22 +22,105 @@ body { margin: 0; font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sa
 .actions button:disabled, button:disabled { opacity: 0.5; cursor: wait; }
 button.big { padding: 12px 22px; font-size: 14px; border-radius: 8px; }
 
-/* PDF export: stamp prepended into <main> during capture, and a body
-   marker that lets us neutralise interactive UI bits (open <details>,
-   sticky hover states) while html2canvas renders the page. */
-.pdf-header {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  text-align: right;
-  margin: -8px 0 0 0;
+/* PDF export via window.print(). A small generated-on stamp is
+   injected into <main> right before print and removed after; we keep
+   it hidden on screen and reveal it only in print. The @media print
+   rules below hide topbar buttons, keep card backgrounds intact
+   (print-color-adjust: exact), and avoid splitting cards across pages. */
+.print-stamp { display: none; }
+
+@media print {
+  @page { size: A4; margin: 12mm 10mm; }
+  html, body {
+    background: #ffffff !important;
+    color: #1a1f29 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .topbar { display: none !important; }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+    gap: 10px !important;
+  }
+  .card,
+  .hero-card,
+  .sources-card,
+  .shape-card,
+  .narrative-card,
+  .behavior-card {
+    background: #ffffff !important;
+    color: #1a1f29 !important;
+    border: 1px solid #cfd6df !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .card h2, .card h3, .card h4, h1, h2, h3, h4 { color: #0a0f17 !important; }
+  .card-eyebrow, .hero-eyebrow { color: #1f6feb !important; }
+  .card-sub, .muted, .axes-explainer-body p { color: #4a5566 !important; }
+  /* Hide the inline 'Generate AI profile' button inside the narrative card */
+  #narrate-btn-inline, .narrative-header button { display: none !important; }
+  /* Always render the explainer details open in print */
+  details > summary { display: none !important; }
+  details > .axes-explainer-body,
+  details:not([open]) > * { display: block !important; }
+  /* Quadrant map: keep dark for legibility of corner pills */
+  .quadrant-map { background: #0e1117 !important; color: #e6edf3 !important; }
+  .qm-corner { color: #ffffff !important; }
+  /* Source bar and progress fills need their colors preserved */
+  .source-bar { background: #e1e6ec !important; }
+  /* Behaviour signal bars: light track, accent fill */
+  .signal { background: transparent !important; color: #1a1f29 !important; }
+  .signal-name { color: #0a0f17 !important; font-weight: 600; }
+  .signal-value, .signal-help { color: #4a5566 !important; }
+  .signal-bar { background: #e1e6ec !important; border-color: #cfd6df !important; }
+  .signal-fill { background: #1f6feb !important; }
+  .signal-fill.effort { background: #1a7f37 !important; }
+  /* Modifier check cards */
+  .modifier {
+    background: #f6f8fa !important;
+    color: #1a1f29 !important;
+    border: 1px solid #cfd6df !important;
+  }
+  .modifier.met { border-color: #1a7f37 !important; }
+  .modifier-tag { color: #0a0f17 !important; }
+  .modifier.met .modifier-tag, .modifier.met .modifier-status { color: #1a7f37 !important; }
+  .modifier-bar { background: #e1e6ec !important; }
+  .modifier-fill { background: #1a7f37 !important; }
+  /* Top N lists (.tables ol) — was muted grey on dark bg */
+  .tables ol, .tables ol li, .tables ol li span.label, .tables ol li span.count {
+    color: #1a1f29 !important;
+  }
+  /* Tag pills in hero */
+  .tags .tag { background: #1f6feb !important; color: #ffffff !important; border-color: #1f6feb !important; }
+  /* Axes summary tiles in hero */
+  .axes .axis { background: #f6f8fa !important; color: #0a0f17 !important; border: 1px solid #cfd6df !important; }
+  .axes .axis-name { color: #4a5566 !important; }
+  /* Make charts fit their card */
+  canvas { max-width: 100% !important; height: auto !important; }
+  /* Reveal and style the generated-on stamp */
+  .print-stamp {
+    display: block !important;
+    font-size: 10px;
+    color: #6b7585 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: right;
+    margin: 0 0 6px 0;
+  }
+  /* Radar legend cards under the chart - were dark with pale text */
+  .shape-legend li {
+    background: #f6f8fa !important;
+    border: 1px solid #cfd6df !important;
+    color: #1a1f29 !important;
+  }
+  .legend-label { color: #0a0f17 !important; font-weight: 600; }
+  .legend-score { color: #1f6feb !important; }
+  .legend-help, .legend-raw { color: #4a5566 !important; }
+  .legend-raw strong { color: #0a0f17 !important; }
+  .legend-dot { background: #1f6feb !important; }
 }
-body.exporting-pdf { overflow: hidden; }
-body.exporting-pdf .topbar { box-shadow: none; }
-body.exporting-pdf details > summary { list-style: none; }
-body.exporting-pdf details > summary::-webkit-details-marker { display: none; }
-body.exporting-pdf details:not([open]) > summary { display: none; }
 main { padding: 24px; max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
 .card h2 { margin-top: 0; }
