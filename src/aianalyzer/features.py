@@ -59,6 +59,15 @@ class SessionFeatures(BaseModel):
     todo_count: int = 0
     abort_rate: float = 0.0
 
+    # Portal-extended fields (M4)
+    cwd: str | None = None
+    avg_user_msg_words: float = 0.0
+    tool_counts: dict[str, int] = Field(default_factory=dict)
+    file_paths_touched: set[str] = Field(default_factory=set)
+    started_hour_local: int = 0
+    started_weekday: int = 0
+    models_used: dict[str, int] = Field(default_factory=dict)
+
 
 def _user_messages(turns: Iterable[Turn]) -> list[str]:
     return [t.user.content for t in turns if t.user is not None]
@@ -181,6 +190,41 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     # S16: abort_rate
     abort_rate = _avg([1.0 if t.aborted else 0.0 for t in turns])
 
+    # Portal-extended fields (M4)
+    # P1: cwd
+    cwd = session.cwd
+
+    # P2: avg_user_msg_words
+    if user_msgs:
+        word_counts = [len(m.split()) for m in user_msgs]
+        avg_user_msg_words = _avg([float(w) for w in word_counts])
+    else:
+        avg_user_msg_words = 0.0
+
+    # P3: tool_counts
+    tool_counts = dict(Counter(c.tool_name for c in all_tool_calls))
+
+    # P4: file_paths_touched
+    file_paths_touched = {
+        str(c.arguments.get("path"))
+        for c in all_tool_calls
+        if c.arguments.get("path") and isinstance(c.arguments.get("path"), str)
+    }
+
+    # P5, P6: started_hour_local, started_weekday
+    if session.started_at:
+        local_start = session.started_at.astimezone()
+        started_hour_local = local_start.hour
+        started_weekday = local_start.weekday()
+    else:
+        started_hour_local = 0
+        started_weekday = 0
+
+    # P7: models_used (dict[str, int] = model → turn count)
+    models_used_dict = dict(Counter(
+        t.assistant.model for t in turns if t.assistant
+    ))
+
     return SessionFeatures(
         session_id=session.session_id,
         client=session.client,
@@ -204,6 +248,13 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         command_repetition_rate=command_repetition,
         todo_count=todo_count,
         abort_rate=abort_rate,
+        cwd=cwd,
+        avg_user_msg_words=avg_user_msg_words,
+        tool_counts=tool_counts,
+        file_paths_touched=file_paths_touched,
+        started_hour_local=started_hour_local,
+        started_weekday=started_weekday,
+        models_used=models_used_dict,
     )
 
 

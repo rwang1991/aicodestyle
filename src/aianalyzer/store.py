@@ -9,7 +9,7 @@ import duckdb
 from aianalyzer.features import SessionFeatures
 
 # Bump whenever SessionFeatures shape changes meaningfully.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class FeatureStore:

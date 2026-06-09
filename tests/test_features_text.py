@@ -48,5 +48,8 @@ def test_all_signal_fields_defined():
         "cwd_switch_count", "command_repetition_rate",
         "todo_count", "abort_rate",
         "test_or_spec_mention_rate", "parallel_tool_call_rate",
+        # Portal-extended fields (M4)
+        "cwd", "avg_user_msg_words", "tool_counts", "file_paths_touched",
+        "started_hour_local", "started_weekday", "models_used",
     }
     assert set(SessionFeatures.model_fields.keys()) == expected_fields
