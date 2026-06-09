@@ -205,3 +205,81 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         todo_count=todo_count,
         abort_rate=abort_rate,
     )
+
+
+class UserProfile(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    session_count: int = 0
+    total_turns: int = 0
+    total_todos: int = 0
+    distinct_models_total: int = 0
+    cwd_switch_count: int = 0
+
+    avg_user_msg_chars: float = 0.0
+    planning_language_ratio: float = 0.0
+    question_ratio: float = 0.0
+    thinks_before_prompt_sec_avg: float = 0.0
+    test_or_spec_mention_rate: float = 0.0
+    tool_diversity: float = 0.0
+    accept_and_go_ratio: float = 0.0
+    revision_depth: float = 0.0
+    session_duration_sec: float = 0.0
+    tool_error_rate: float = 0.0
+    edited_files_per_turn_avg: float = 0.0
+    parallel_tool_call_rate: float = 0.0
+    abort_rate: float = 0.0
+    reasoning_effort_distribution: dict[str, float] = Field(default_factory=dict)
+
+
+_WEIGHTED_SCALARS = (
+    "avg_user_msg_chars",
+    "planning_language_ratio",
+    "question_ratio",
+    "thinks_before_prompt_sec_avg",
+    "test_or_spec_mention_rate",
+    "tool_diversity",
+    "accept_and_go_ratio",
+    "revision_depth",
+    "session_duration_sec",
+    "tool_error_rate",
+    "edited_files_per_turn_avg",
+    "parallel_tool_call_rate",
+    "abort_rate",
+)
+
+
+def aggregate_user_profile(
+    features: list[SessionFeatures],
+    cwd_history: list[str | None],
+) -> UserProfile:
+    if not features:
+        return UserProfile()
+
+    total_turns = sum(f.turn_count for f in features) or 1
+    weighted: dict[str, float] = {}
+    for field in _WEIGHTED_SCALARS:
+        weighted[field] = sum(getattr(f, field) * f.turn_count for f in features) / total_turns
+
+    merged_efforts: Counter[str] = Counter()
+    for f in features:
+        for k, v in f.reasoning_effort_distribution.items():
+            merged_efforts[k] += v * f.turn_count
+    if merged_efforts:
+        s = sum(merged_efforts.values())
+        merged_distribution = {k: v / s for k, v in merged_efforts.items()}
+    else:
+        merged_distribution = {}
+
+    distinct_cwds = {c for c in cwd_history if c}
+    cwd_switches = max(len(distinct_cwds) - 1, 0)
+
+    return UserProfile(
+        session_count=len(features),
+        total_turns=sum(f.turn_count for f in features),
+        total_todos=sum(f.todo_count for f in features),
+        distinct_models_total=max((f.model_variety for f in features), default=0),
+        cwd_switch_count=cwd_switches,
+        reasoning_effort_distribution=merged_distribution,
+        **weighted,
+    )
