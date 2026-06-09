@@ -52,6 +52,35 @@
       <div class="card"><h3>Top file types</h3><ol id="top-exts"></ol></div>
     </section>
 
+    <section class="behavior">
+      <div class="card behavior-card">
+        <h3>Behavior signals</h3>
+        <p class="behavior-help">
+          The raw measurements behind your archetype. Bars show each signal vs
+          the 100% point used by the classifier; modifiers fire when you cross
+          their threshold.
+        </p>
+        <div class="behavior-cols">
+          <div>
+            <h4>Planning axis inputs</h4>
+            <ul id="behavior-planning" class="signal-list"></ul>
+          </div>
+          <div>
+            <h4>Control axis inputs</h4>
+            <ul id="behavior-control" class="signal-list"></ul>
+          </div>
+          <div>
+            <h4>Other signals</h4>
+            <ul id="behavior-other" class="signal-list"></ul>
+            <h4 class="effort-heading">Reasoning effort mix</h4>
+            <ul id="behavior-effort" class="signal-list compact"></ul>
+          </div>
+        </div>
+        <h4 class="modifier-heading">Modifier checks</h4>
+        <ul id="behavior-modifiers" class="modifier-list"></ul>
+      </div>
+    </section>
+
     <section id="narrative-section" class="card hidden">
       <h2>Your AI Profile</h2>
       <div id="narrative-status"></div>

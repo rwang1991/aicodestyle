@@ -56,3 +56,35 @@ main { padding: 24px; max-width: 1280px; margin: 0 auto; display: flex; flex-dir
   border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 100; }
 .toast.error { border-color: var(--bad); color: var(--bad); }
+
+/* Behavior signals panel */
+.behavior .behavior-card { padding: 18px; }
+.behavior-help { color: var(--muted); font-size: 12px; margin: 0 0 16px; }
+.behavior-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+.behavior-cols h4 { margin: 0 0 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.behavior-cols h4.effort-heading { margin-top: 16px; }
+.signal-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.signal-list.compact { gap: 4px; }
+.signal { font-size: 12px; }
+.signal.muted { color: var(--muted); font-style: italic; }
+.signal-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.signal-name { color: var(--fg); }
+.signal-value { color: var(--muted); font-variant-numeric: tabular-nums; }
+.signal-bar { height: 6px; background: #0a0e14; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+.signal-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+.signal-fill.effort { background: var(--good); }
+.modifier-heading { margin: 18px 0 8px !important; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.modifier-list { list-style: none; padding: 0; margin: 0; display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.modifier { background: #0a0e14; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 12px; }
+.modifier.met { border-color: var(--good); }
+.modifier.miss { border-color: var(--border); }
+.modifier-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.modifier-tag { font-weight: 600; text-transform: lowercase; color: var(--fg); }
+.modifier.met .modifier-tag { color: var(--good); }
+.modifier-status { color: var(--muted); font-size: 11px; }
+.modifier.met .modifier-status { color: var(--good); }
+.modifier-bar { height: 6px; background: #050709; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+.modifier-fill { height: 100%; background: var(--warn); transition: width 0.3s ease; }
+.modifier.met .modifier-fill { background: var(--good); }
+.modifier-meta { margin-top: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }

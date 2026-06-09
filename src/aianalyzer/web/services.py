@@ -6,11 +6,39 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from aianalyzer.classifier.rules import classify
+from aianalyzer.classifier.weights import load_weights
 from aianalyzer.collectors.copilot_cli import CopilotCliCollector
 from aianalyzer.discovery import DiscoveredSession, discover_copilot_cli_sessions
-from aianalyzer.features import aggregate_user_profile, extract_session_features
+from aianalyzer.features import UserProfile, aggregate_user_profile, extract_session_features
 from aianalyzer.stats import compute_extended_profile
 from aianalyzer.store import FeatureStore
+
+
+# Human labels for the raw behavior signals surfaced in the portal.
+_BEHAVIOR_LABELS: dict[str, str] = {
+    "planning_language_ratio": "Planning language",
+    "question_ratio": "Question ratio",
+    "thinks_before_prompt_sec_avg": "Think time (sec)",
+    "test_or_spec_mention_rate": "Test / spec mentions",
+    "todo_density": "Todos per session",
+    "tool_diversity": "Tool diversity",
+    "edited_files_per_turn_avg": "Files edited / turn",
+    "accept_and_go_ratio": "Accept-and-go",
+    "revision_depth": "Revision depth",
+    "tool_error_rate": "Tool error rate",
+    "parallel_tool_call_rate": "Parallel tool calls",
+    "abort_rate": "Aborted turns",
+}
+
+# Maps a modifier tag to the signal it gates on and the weight-key holding the
+# threshold in weights.yaml. Keeps payload construction declarative.
+_MODIFIER_SPECS: list[tuple[str, str, str]] = [
+    ("questioner", "question_ratio", "questioner_min_question_ratio"),
+    ("debugger", "tool_error_rate", "debugger_min_tool_error_rate"),
+    ("planner", "todo_density", "planner_min_todo_density"),
+    ("yolo", "accept_and_go_ratio", "yolo_min_accept_and_go"),
+    ("parallelist", "parallel_tool_call_rate", "parallelist_min_parallel_tool_call_rate"),
+]
 
 
 def discover_all_sessions() -> Iterable[DiscoveredSession]:
@@ -31,6 +59,73 @@ def _cache_path() -> Path:
 def _confidence(planning: float, control: float) -> float:
     """Bounded heuristic: stronger axis magnitudes => higher confidence."""
     return min(1.0, (abs(planning) + abs(control)) / 2.0)
+
+
+def _signal_value(profile: UserProfile, name: str) -> float:
+    """Mirror of ``classifier.rules._signal_value`` for portal display.
+
+    Kept duplicated rather than imported so the underscore-prefixed helper
+    in the classifier package stays private to that package.
+    """
+    if name == "todo_density":
+        sessions = max(profile.session_count, 1)
+        return profile.total_todos / sessions
+    return float(getattr(profile, name, 0.0))
+
+
+def _signal_row(name: str, value: float, norm_max: float | None = None) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "name": name,
+        "label": _BEHAVIOR_LABELS.get(name, name),
+        "value": round(value, 3),
+    }
+    if norm_max is not None:
+        row["norm_max"] = norm_max
+    return row
+
+
+def _build_behavior_block(profile: UserProfile) -> dict[str, Any]:
+    """Surface the raw signals + modifier near-misses behind the archetype."""
+    w = load_weights()
+    def _norm_max(signal: str) -> float | None:
+        rng = w.normalizers.get(signal)
+        return rng.max if rng is not None else None
+
+    planning_signals = [
+        _signal_row(s, _signal_value(profile, s), _norm_max(s))
+        for s in w.planning.keys()
+    ]
+    control_signals = [
+        _signal_row(s, _signal_value(profile, s), _norm_max(s))
+        for s in w.control.keys()
+    ]
+    other_signals = [
+        _signal_row("parallel_tool_call_rate", profile.parallel_tool_call_rate),
+        _signal_row("abort_rate", profile.abort_rate),
+    ]
+    modifiers = []
+    for tag, signal, key in _MODIFIER_SPECS:
+        value = _signal_value(profile, signal)
+        threshold = float(w.modifiers[key])
+        modifiers.append(
+            {
+                "tag": tag,
+                "signal": signal,
+                "label": _BEHAVIOR_LABELS.get(signal, signal),
+                "value": round(value, 3),
+                "threshold": threshold,
+                "met": value >= threshold,
+            }
+        )
+    return {
+        "planning": planning_signals,
+        "control": control_signals,
+        "other": other_signals,
+        "modifiers": modifiers,
+        "reasoning_effort_distribution": {
+            k: round(v, 3) for k, v in profile.reasoning_effort_distribution.items()
+        },
+    }
 
 
 def run_scan(progress_cb=None) -> dict[str, int]:
@@ -109,4 +204,5 @@ def load_profile_payload() -> dict[str, Any]:
         "activity_per_day_last_90": ext.activity_per_day_last_90,
         "first_session_at": ext.first_session_at.isoformat() if ext.first_session_at else None,
         "last_session_at": ext.last_session_at.isoformat() if ext.last_session_at else None,
+        "behavior": _build_behavior_block(user_profile),
     }

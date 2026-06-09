@@ -198,6 +198,82 @@
     }
   }
 
+  function renderBehavior(p) {
+    const behavior = p.behavior || {};
+    const renderSignalList = (selector, signals) => {
+      const ul = $(selector);
+      ul.innerHTML = "";
+      for (const sig of signals || []) {
+        const li = document.createElement("li");
+        li.className = "signal";
+        const max = sig.norm_max;
+        let pct = 0;
+        let scaleNote = "";
+        if (typeof max === "number" && max > 0) {
+          pct = Math.max(0, Math.min(1, (sig.value || 0) / max));
+          scaleNote = ` / ${max}`;
+        } else {
+          pct = Math.max(0, Math.min(1, sig.value || 0));
+        }
+        li.innerHTML = `
+          <div class="signal-row">
+            <span class="signal-name">${sig.label}</span>
+            <span class="signal-value">${(sig.value ?? 0).toFixed(2)}${scaleNote}</span>
+          </div>
+          <div class="signal-bar"><div class="signal-fill" style="width:${(pct * 100).toFixed(0)}%"></div></div>
+        `;
+        ul.appendChild(li);
+      }
+    };
+    renderSignalList("#behavior-planning", behavior.planning);
+    renderSignalList("#behavior-control", behavior.control);
+    renderSignalList("#behavior-other", behavior.other);
+
+    const effortUl = $("#behavior-effort");
+    effortUl.innerHTML = "";
+    const efforts = behavior.reasoning_effort_distribution || {};
+    const entries = Object.entries(efforts).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) {
+      const li = document.createElement("li");
+      li.className = "signal muted";
+      li.textContent = "no reasoning-effort events captured";
+      effortUl.appendChild(li);
+    } else {
+      for (const [name, share] of entries) {
+        const li = document.createElement("li");
+        li.className = "signal";
+        const pct = Math.max(0, Math.min(1, share));
+        li.innerHTML = `
+          <div class="signal-row">
+            <span class="signal-name">${name}</span>
+            <span class="signal-value">${(pct * 100).toFixed(0)}%</span>
+          </div>
+          <div class="signal-bar"><div class="signal-fill effort" style="width:${(pct * 100).toFixed(0)}%"></div></div>
+        `;
+        effortUl.appendChild(li);
+      }
+    }
+
+    const modUl = $("#behavior-modifiers");
+    modUl.innerHTML = "";
+    for (const m of behavior.modifiers || []) {
+      const li = document.createElement("li");
+      li.className = `modifier ${m.met ? "met" : "miss"}`;
+      const ratio = m.threshold > 0 ? (m.value || 0) / m.threshold : 0;
+      const pct = Math.max(0, Math.min(1.15, ratio));
+      const pctOfThreshold = Math.round(ratio * 100);
+      li.innerHTML = `
+        <div class="modifier-row">
+          <span class="modifier-tag">${m.tag}</span>
+          <span class="modifier-status">${m.met ? "applied" : `${pctOfThreshold}% of threshold`}</span>
+        </div>
+        <div class="modifier-bar"><div class="modifier-fill" style="width:${(pct * 100 / 1.15).toFixed(0)}%"></div></div>
+        <div class="modifier-meta">${m.label}: ${(m.value ?? 0).toFixed(2)} vs ≥ ${m.threshold.toFixed(2)}</div>
+      `;
+      modUl.appendChild(li);
+    }
+  }
+
   async function pollJob(jobId, onUpdate) {
     for (;;) {
       const j = await fetchJson(`/api/jobs/${jobId}`);
@@ -269,6 +345,7 @@
       renderKpis(profile);
       renderLists(profile);
       renderCharts(profile);
+      renderBehavior(profile);
     } catch (e) {
       toast(`Failed to load profile: ${e.message}`);
     }

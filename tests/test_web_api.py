@@ -41,6 +41,38 @@ def test_jobs_returns_404_for_unknown_id():
     assert r.status_code == 404
 
 
+def test_profile_includes_behavior_block_with_modifiers(tmp_path, monkeypatch):
+    """The behavior block exposes the raw signals used by the classifier and
+    a modifier-by-modifier breakdown so the user can see *why* each tag did or
+    didn't apply. Empty cache => zeroed signals + every modifier missed."""
+    monkeypatch.setenv("AIANALYZER_CACHE_DIR", str(tmp_path))
+    from aianalyzer.web import services
+    monkeypatch.setattr(services, "discover_all_sessions", lambda: [])
+    client = TestClient(create_app())
+    p = client.get("/api/profile").json()
+
+    b = p["behavior"]
+    plan_names = {row["name"] for row in b["planning"]}
+    assert {"planning_language_ratio", "question_ratio", "todo_density"} <= plan_names
+    ctrl_names = {row["name"] for row in b["control"]}
+    assert {"tool_diversity", "accept_and_go_ratio", "tool_error_rate"} <= ctrl_names
+
+    # Every planning/control row carries its normalizer ceiling so the bar can
+    # render value/norm_max correctly.
+    for row in b["planning"] + b["control"]:
+        assert "norm_max" in row and row["norm_max"] > 0
+
+    mods = b["modifiers"]
+    tags = {m["tag"] for m in mods}
+    assert tags == {"questioner", "debugger", "planner", "yolo", "parallelist"}
+    for m in mods:
+        assert "threshold" in m and m["threshold"] > 0
+        # With an empty cache every signal is 0 -> every modifier misses.
+        assert m["met"] is False
+
+    assert isinstance(b["reasoning_effort_distribution"], dict)
+
+
 def test_scan_job_reports_failure_on_discovery_error(tmp_path, monkeypatch):
     monkeypatch.setenv("AIANALYZER_CACHE_DIR", str(tmp_path))
     from aianalyzer.web import services
