@@ -82,7 +82,11 @@ Add a lightweight migration *after* `CREATE TABLE`:
 ```python
 cols = {row[1] for row in self._con.execute("PRAGMA table_info('features')").fetchall()}
 if "schema_version" not in cols:
-    self._con.execute("ALTER TABLE features ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0")
+    # DuckDB ALTER TABLE ADD COLUMN does NOT support NOT NULL constraints,
+    # so the migrated column is nullable. This is safe: every upsert() writes an explicit
+    # SCHEMA_VERSION, and read-side filters use `schema_version = SCHEMA_VERSION`
+    # which excludes both NULL and stale rows.
+    self._con.execute("ALTER TABLE features ADD COLUMN schema_version INTEGER DEFAULT 0")
 ```
 Update `upsert` to write `SCHEMA_VERSION`. Update `has_fresh` and `load_all` to require `schema_version = ?` with `SCHEMA_VERSION`. (FeatureStore uses `self._con` as a direct DuckDB connection attribute, the table name is `features`, and the only read methods are `has_fresh` and `load_all` — no `get()` exists.)
 
