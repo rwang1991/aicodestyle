@@ -694,39 +694,151 @@
   async function wireExportPdf() {
     const btn = $("#export-pdf-btn");
     if (!btn) return;
+    if (typeof window.html2pdf !== "function") {
+      btn.disabled = true;
+      btn.title = "PDF export library failed to load.";
+      return;
+    }
 
-    let stampNode = null;
-    let originalTitle = null;
+    // Capture-time layout overrides. We mutate inline styles directly
+    // (instead of relying on a body class) because html2canvas clones
+    // the document into a hidden iframe and dynamic class-toggled CSS
+    // is sometimes missed by the cascade in that clone. Each entry
+    // is restored after capture.
+    const PDF_WIDTH = 780;
+    function pinLayout() {
+      const restore = [];
+      const setStyle = (el, prop, value) => {
+        if (!el) return;
+        restore.push({ el, prop, prev: el.style[prop] });
+        el.style[prop] = value;
+      };
+      const main = document.getElementById("app");
+      setStyle(main, "width", PDF_WIDTH + "px");
+      setStyle(main, "maxWidth", PDF_WIDTH + "px");
+      setStyle(main, "padding", "14px");
+      // Pin main to the viewport's left edge so html2canvas captures at (0,0)
+      // rather than the centered offset (which leaves content clipped).
+      setStyle(main, "margin", "0");
+      setStyle(main, "marginLeft", "0");
+      document.querySelectorAll(".hero-card, .shape-body, .axes-explainer-body, .charts, .tables, .behavior-cols")
+        .forEach((el) => setStyle(el, "gridTemplateColumns", "1fr"));
+      document.querySelectorAll(".chart-wide")
+        .forEach((el) => setStyle(el, "gridColumn", "auto"));
+      document.querySelectorAll(".charts canvas")
+        .forEach((el) => setStyle(el, "maxHeight", "240px"));
+      // Force the <details> blocks open so axes-explainer paragraphs render
+      const opened = [];
+      document.querySelectorAll("details").forEach((el) => {
+        if (!el.open) { opened.push(el); el.open = true; }
+      });
+      // Hide the topbar + inline narrate button
+      setStyle(document.querySelector(".topbar"), "display", "none");
+      setStyle(document.getElementById("narrate-btn-inline"), "display", "none");
+      // CSS Grid won't shrink children below their min-content. Chart cards
+      // sit inside .charts with intrinsically wide canvases from a previous
+      // render, so columns refuse to shrink. Force min-width: 0 + clear
+      // canvas size so grid cells collapse to the pinned 780-wide row, THEN
+      // resize() the chart below.
+      document.querySelectorAll(".charts > .card, .tables > .card").forEach((el) => {
+        setStyle(el, "minWidth", "0");
+      });
+      document.querySelectorAll(".charts canvas, .hero-card canvas").forEach((cnv) => {
+        cnv.style.width = "";
+        cnv.style.height = "";
+        cnv.removeAttribute("width");
+        cnv.removeAttribute("height");
+      });
+      // Force a synchronous layout reflow so .card widths re-compute.
+      void document.body.offsetHeight;
+      return { restore, opened };
+    }
+    function unpinLayout({ restore, opened }) {
+      for (const { el, prop, prev } of restore) {
+        el.style[prop] = prev || "";
+      }
+      for (const el of opened) el.open = false;
+    }
 
-    // Inject a generated-on stamp into <main> and set a friendly
-    // document.title so the browser's "Save as PDF" dialog suggests a
-    // useful filename. Restore both after the print dialog closes.
-    const onBeforePrint = () => {
+    btn.addEventListener("click", async () => {
       const main = document.getElementById("app");
       if (!main) return;
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Preparing PDF…";
+
+      const pinned = pinLayout();
+
+      const stampNode = document.createElement("div");
+      stampNode.className = "pdf-header";
       const now = new Date();
       const pad = (n) => String(n).padStart(2, "0");
       const ymd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
       const hms = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      originalTitle = document.title;
-      document.title = `aianalyzer-report-${ymd}`;
-      stampNode = document.createElement("div");
-      stampNode.className = "print-stamp";
       stampNode.textContent = `AIAnalyzer report · generated ${ymd} ${hms}`;
       main.insertBefore(stampNode, main.firstChild);
-    };
-    const onAfterPrint = () => {
-      if (stampNode) { stampNode.remove(); stampNode = null; }
-      if (originalTitle !== null) { document.title = originalTitle; originalTitle = null; }
-    };
-    window.addEventListener("beforeprint", onBeforePrint);
-    window.addEventListener("afterprint", onAfterPrint);
 
-    btn.addEventListener("click", () => {
+      // Two RAFs so Chart.js resize observers can react to the new column width.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      // Force every Chart.js instance to re-render at the pinned container width.
+      // Chart.js's responsive ResizeObserver fires asynchronously and sometimes
+      // misses our synchronous style change, so we call resize() with explicit
+      // dimensions read from the actual parent .card box after pin.
       try {
-        window.print();
+        Object.values(charts).forEach((c) => {
+          if (!c || typeof c.resize !== "function") return;
+          const cnv = c.canvas;
+          const parent = cnv && cnv.parentNode;
+          if (parent) {
+            cnv.style.width = "";
+            cnv.style.height = "";
+            cnv.removeAttribute("width");
+            cnv.removeAttribute("height");
+            const targetW = parent.clientWidth;
+            const targetH = Math.min(240, Math.round(targetW * 0.45));
+            c.resize(targetW, targetH);
+          } else {
+            c.resize();
+          }
+        });
+      } catch (_) {}
+      // And give Chart.js a moment to actually redraw after resize.
+      await new Promise((r) => setTimeout(r, 250));
+
+      try {
+        btn.textContent = "Rendering PDF…";
+        const mainRect = main.getBoundingClientRect();
+        await window.html2pdf()
+          .set({
+            margin: [12, 10, 14, 10],
+            filename: `aianalyzer-report-${ymd}.pdf`,
+            image: { type: "jpeg", quality: 0.95 },
+            html2canvas: {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: "#0e1117",
+              width: PDF_WIDTH,
+              windowWidth: PDF_WIDTH,
+              // Force capture from the element's actual left/top so the canvas
+              // covers main itself (not a shifted slice of the viewport).
+              x: mainRect.left + window.scrollX,
+              y: mainRect.top + window.scrollY,
+              scrollX: 0,
+              scrollY: 0,
+            },
+            jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+            pagebreak: { mode: ["css", "legacy"] },
+          })
+          .from(main)
+          .save();
+        toast("PDF downloaded.", "info", 3500);
       } catch (e) {
-        toast(`Could not open print dialog: ${e.message || e}`);
+        toast(`PDF export failed: ${e.message || e}`);
+      } finally {
+        stampNode.remove();
+        unpinLayout(pinned);
+        btn.disabled = false;
+        btn.textContent = original;
       }
     });
   }

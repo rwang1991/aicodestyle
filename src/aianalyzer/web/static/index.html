@@ -11,7 +11,7 @@
     <div class="brand">AIAnalyzer</div>
     <div class="actions">
       <button id="scan-btn" title="Re-discover and re-parse all session files on disk.">Scan sessions</button>
-      <button id="export-pdf-btn" title="Open the browser's print dialog. Choose 'Save as PDF' as the destination to download a copy of this report.">Save as PDF</button>
+      <button id="export-pdf-btn" title="Download this report as a PDF (snapshot of the dark-themed view).">Export PDF</button>
       <button id="narrate-btn" class="primary" title="Ask the local Copilot CLI to write a personalised AI Profile narrative from the statistics on this page.">Generate AI profile</button>
     </div>
   </header>
@@ -85,18 +85,6 @@
       </div>
     </section>
 
-    <section id="data-sources" class="card sources-card" hidden>
-      <div class="card-eyebrow">Data sources for this analysis</div>
-      <h2>Where your sessions came from</h2>
-      <p class="card-sub">
-        Your archetype and all metrics on this page are computed across every
-        session below, weighted by turn count. Different AI tools capture
-        different signals — see the note at the bottom.
-      </p>
-      <ul id="data-sources-list" class="sources-list"></ul>
-      <p id="data-sources-note" class="sources-note muted"></p>
-    </section>
-
     <section id="behavior-shape" class="card shape-card">
       <div class="shape-header">
         <div>
@@ -115,6 +103,18 @@
         </div>
         <ul id="behavior-radar-legend" class="shape-legend"></ul>
       </div>
+    </section>
+
+    <section id="data-sources" class="card sources-card" hidden>
+      <div class="card-eyebrow">Data sources for this analysis</div>
+      <h2>Where your sessions came from</h2>
+      <p class="card-sub">
+        Your archetype and all metrics on this page are computed across every
+        session below, weighted by turn count. Different AI tools capture
+        different signals — see the note at the bottom.
+      </p>
+      <ul id="data-sources-list" class="sources-list"></ul>
+      <p id="data-sources-note" class="sources-note muted"></p>
     </section>
 
     <section id="narrative-section" class="card narrative-card">
@@ -220,6 +220,7 @@
 
   <script src="/static/chart.umd.js"></script>
   <script src="/static/marked.min.js"></script>
+  <script src="/static/html2pdf.bundle.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

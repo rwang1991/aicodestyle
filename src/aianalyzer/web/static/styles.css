@@ -22,60 +22,37 @@ body { margin: 0; font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sa
 .actions button:disabled, button:disabled { opacity: 0.5; cursor: wait; }
 button.big { padding: 12px 22px; font-size: 14px; border-radius: 8px; }
 
-/* PDF export via window.print(). A small generated-on stamp is
-   injected into <main> right before print and removed after; we keep
-   it hidden on screen and reveal it only in print. The @media print
-   rules below preserve the portal's dark theme (print-color-adjust:
-   exact), hide topbar buttons, and avoid splitting cards across pages
-   so the PDF looks like a faithful screenshot of the portal. */
-.print-stamp { display: none; }
-
-@media print {
-  @page { size: A4; margin: 10mm; background: var(--bg); }
-  html, body {
-    background: var(--bg) !important;
-    color: var(--fg) !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-  /* Force the dark background to bleed to the page edges */
-  body { margin: 0 !important; padding: 0 !important; }
-  .topbar { display: none !important; }
-  main {
-    padding: 12px !important;
-    max-width: none !important;
-    gap: 10px !important;
-    background: var(--bg) !important;
-  }
-  /* Preserve every card's own dark background and avoid splits across pages */
-  .card,
-  .hero-card,
-  .sources-card,
-  .shape-card,
-  .narrative-card,
-  .behavior-card {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-  /* Hide the inline 'Generate AI profile' button inside the narrative card */
-  #narrate-btn-inline, .narrative-header button { display: none !important; }
-  /* Always render the explainer details open in print (chevron is for screen) */
-  details > summary { display: none !important; }
-  details > .axes-explainer-body,
-  details:not([open]) > * { display: block !important; }
-  /* Charts: ensure they fit their card width */
-  canvas { max-width: 100% !important; height: auto !important; }
-  /* Reveal and style the generated-on stamp (matches the dark theme) */
-  .print-stamp {
-    display: block !important;
-    font-size: 10px;
-    color: var(--muted) !important;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    text-align: right;
-    margin: 0 0 6px 0;
-  }
+/* PDF export via html2pdf.js. While the user clicks "Export PDF" we
+   apply body.exporting-pdf to pin the layout to a narrow A4-friendly
+   width and force every grid (charts, tables, behavior signals,
+   hero, etc.) into a single column. html2canvas then snapshots a
+   clean predictable layout so the PDF is a faithful copy of the
+   portal's dark theme. The stamp lives in <main> just for the
+   capture and is removed afterwards. */
+.pdf-header {
+  font-size: 10px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.08em; text-align: right; margin: 0 0 6px 0;
 }
+body.exporting-pdf .topbar { display: none !important; }
+body.exporting-pdf main { max-width: 800px !important; padding: 14px !important; gap: 12px !important; }
+body.exporting-pdf .hero-card { grid-template-columns: 1fr !important; }
+body.exporting-pdf .charts { grid-template-columns: 1fr !important; }
+body.exporting-pdf .tables { grid-template-columns: 1fr !important; }
+body.exporting-pdf .behavior-cols { grid-template-columns: 1fr !important; }
+body.exporting-pdf .shape-body { grid-template-columns: 1fr !important; }
+body.exporting-pdf .axes-explainer-body { grid-template-columns: 1fr !important; }
+body.exporting-pdf .chart-wide { grid-column: auto !important; }
+body.exporting-pdf .charts canvas { max-height: 240px !important; }
+body.exporting-pdf details:not([open]) > * { display: revert !important; }
+body.exporting-pdf details > summary { display: none !important; }
+body.exporting-pdf #narrate-btn-inline { display: none !important; }
+/* Force every card not to be split mid-section by html2pdf */
+body.exporting-pdf .card,
+body.exporting-pdf .hero-card,
+body.exporting-pdf .sources-card,
+body.exporting-pdf .shape-card,
+body.exporting-pdf .narrative-card,
+body.exporting-pdf .behavior-card { page-break-inside: avoid; break-inside: avoid; }
 main { padding: 24px; max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
 .card h2 { margin-top: 0; }
