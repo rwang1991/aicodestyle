@@ -21,6 +21,23 @@ body { margin: 0; font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sa
 .actions button.primary, button.primary { background: var(--accent); color: #000; border: 0; }
 .actions button:disabled, button:disabled { opacity: 0.5; cursor: wait; }
 button.big { padding: 12px 22px; font-size: 14px; border-radius: 8px; }
+
+/* PDF export: stamp prepended into <main> during capture, and a body
+   marker that lets us neutralise interactive UI bits (open <details>,
+   sticky hover states) while html2canvas renders the page. */
+.pdf-header {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: right;
+  margin: -8px 0 0 0;
+}
+body.exporting-pdf { overflow: hidden; }
+body.exporting-pdf .topbar { box-shadow: none; }
+body.exporting-pdf details > summary { list-style: none; }
+body.exporting-pdf details > summary::-webkit-details-marker { display: none; }
+body.exporting-pdf details:not([open]) > summary { display: none; }
 main { padding: 24px; max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
 .card h2 { margin-top: 0; }

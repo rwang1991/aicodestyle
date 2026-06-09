@@ -691,6 +691,64 @@
     for (const btn of buttons) btn.addEventListener("click", run);
   }
 
+  async function wireExportPdf() {
+    const btn = $("#export-pdf-btn");
+    if (!btn) return;
+    if (typeof window.html2pdf !== "function") {
+      btn.disabled = true;
+      btn.title = "PDF export library failed to load.";
+      return;
+    }
+    btn.addEventListener("click", async () => {
+      const main = document.getElementById("app");
+      if (!main) return;
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Preparing PDF…";
+
+      // Prepend a small header so the captured PDF identifies itself
+      // (we are NOT capturing the topbar, so the brand line otherwise
+      // would not appear in the file).
+      const stampNode = document.createElement("div");
+      stampNode.className = "pdf-header";
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const ymd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const hms = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      stampNode.textContent = `AIAnalyzer report · generated ${ymd} ${hms}`;
+      main.insertBefore(stampNode, main.firstChild);
+      document.body.classList.add("exporting-pdf");
+
+      try {
+        btn.textContent = "Rendering PDF…";
+        await window.html2pdf()
+          .set({
+            margin: [16, 12, 18, 12],
+            filename: `aianalyzer-report-${ymd}.pdf`,
+            image: { type: "jpeg", quality: 0.95 },
+            html2canvas: {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: "#0d1117",
+              windowWidth: 1180,
+            },
+            jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+            pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+          })
+          .from(main)
+          .save();
+        toast("PDF downloaded.", "info", 3500);
+      } catch (e) {
+        toast(`PDF export failed: ${e.message || e}`);
+      } finally {
+        stampNode.remove();
+        document.body.classList.remove("exporting-pdf");
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  }
+
   async function load() {
     try {
       const profile = await fetchJson("/api/profile");
@@ -716,6 +774,7 @@
   document.addEventListener("DOMContentLoaded", async () => {
     wireScan();
     wireNarrative();
+    wireExportPdf();
     await load();
   });
 })();
