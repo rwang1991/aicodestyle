@@ -66,3 +66,31 @@ def test_render_report_handles_empty_session_list():
     out = buf.getvalue()
     assert "Vibe Coder" in out
     assert "0 sessions" in out
+
+
+def test_render_report_falls_back_to_ascii_sparkline_on_cp1252():
+    """On Windows the console codepage is cp1252, which has no glyphs for the
+    U+2581..U+2588 block characters used by the unicode sparkline. The renderer
+    must downgrade gracefully instead of raising UnicodeEncodeError.
+    """
+
+    class _Cp1252Buffer(StringIO):
+        encoding = "cp1252"
+
+    profile = UserProfile(session_count=3, total_turns=42)
+    result = ClassificationResult(
+        planning_score=0.3, control_score=0.4,
+        primary=Archetype.ARCHITECT, secondary=None,
+        tags=["planner"], macro_label="Architect", secondary_margin=0.15,
+    )
+    sessions = [_sf(0, 5), _sf(1, 20), _sf(2, 17)]
+    buf = _Cp1252Buffer()
+    console = Console(file=buf, force_terminal=False, width=120, color_system=None)
+    render_report(profile, result, sessions, console=console)
+    out = buf.getvalue()
+
+    assert "timeline" in out
+    # No unicode block chars (they would later crash flush on a real cp1252 stdout).
+    assert not any(ch in out for ch in "▁▂▃▄▅▆▇█")
+    # ASCII fallback chars appear instead.
+    assert any(ch in out for ch in ".:-=+*#")

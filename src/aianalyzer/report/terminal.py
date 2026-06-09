@@ -10,17 +10,39 @@ from rich.table import Table
 from aianalyzer.classifier.archetypes import ClassificationResult
 from aianalyzer.features import SessionFeatures, UserProfile
 
-_SPARK_CHARS = "▁▂▃▄▅▆▇█"
+_SPARK_CHARS_UNICODE = "▁▂▃▄▅▆▇█"
+_SPARK_CHARS_ASCII = " .:-=+*#"
 
 
-def _sparkline(values: Sequence[float]) -> str:
+def _spark_chars_for(console: Console) -> str:
+    """Return the block-drawing characters safe to print to ``console``.
+
+    Windows consoles default to cp1252, which has no glyphs for U+2581..U+2588;
+    rich raises UnicodeEncodeError when it flushes them. Fall back to ASCII
+    whenever the console's underlying file cannot encode the block characters.
+    Files with no ``encoding`` (e.g. StringIO buffers used in tests) carry
+    arbitrary text and keep the prettier Unicode glyphs.
+    """
+    enc = getattr(console.file, "encoding", None)
+    if not enc:
+        return _SPARK_CHARS_UNICODE
+    if "utf" in enc.lower():
+        return _SPARK_CHARS_UNICODE
+    try:
+        _SPARK_CHARS_UNICODE.encode(enc)
+        return _SPARK_CHARS_UNICODE
+    except (UnicodeEncodeError, LookupError):
+        return _SPARK_CHARS_ASCII
+
+
+def _sparkline(values: Sequence[float], chars: str = _SPARK_CHARS_UNICODE) -> str:
     if not values:
         return ""
     hi = max(values)
     if hi <= 0:
-        return _SPARK_CHARS[0] * len(values)
-    step = hi / (len(_SPARK_CHARS) - 1)
-    return "".join(_SPARK_CHARS[min(len(_SPARK_CHARS) - 1, int(v / step))] for v in values)
+        return chars[0] * len(values)
+    step = hi / (len(chars) - 1)
+    return "".join(chars[min(len(chars) - 1, int(v / step))] for v in values)
 
 
 _SIGNAL_LABELS: list[tuple[str, str]] = [
@@ -77,5 +99,8 @@ def render_report(
 
     if sessions:
         ordered = sorted(sessions, key=lambda s: s.started_at)
-        spark = _sparkline([float(s.turn_count) for s in ordered])
+        spark = _sparkline(
+            [float(s.turn_count) for s in ordered],
+            chars=_spark_chars_for(console),
+        )
         console.print(f"timeline (turns/session): {spark}")
