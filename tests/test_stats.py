@@ -73,10 +73,38 @@ def test_compute_extended_profile_handles_empty_input():
     assert p.total_sessions == 0
     assert p.total_turns == 0
     assert p.session_type_counts == {}
+    assert p.by_client == {}
     assert p.top_tools == []
     assert p.hour_histogram == [0] * 24
     assert p.weekday_histogram == [0] * 7
     assert p.activity_per_day_last_90 == []
+
+
+def test_by_client_breakdown_aggregates_sessions_turns_and_tool_calls():
+    """Multiple clients must produce a per-client {sessions, turns, hours, tool_calls}."""
+    sessions = [
+        _sf(session_id="cli1", client="copilot-cli", turn_count=4,
+            tool_counts={"edit": 3, "bash": 2}, session_duration_sec=3600.0),
+        _sf(session_id="cli2", client="copilot-cli", turn_count=6,
+            tool_counts={"edit": 1}),
+        _sf(session_id="vsc1", client="vscode-copilot", turn_count=10,
+            tool_counts={"copilot_readFile": 8, "copilot_replaceString": 2},
+            session_duration_sec=1800.0),
+    ]
+    p = compute_extended_profile(sessions)
+
+    assert set(p.by_client.keys()) == {"copilot-cli", "vscode-copilot"}
+    cli = p.by_client["copilot-cli"]
+    vsc = p.by_client["vscode-copilot"]
+    assert cli["sessions"] == 2
+    assert cli["turns"] == 10
+    assert cli["tool_calls"] == 6  # 3+2+1
+    assert vsc["sessions"] == 1
+    assert vsc["turns"] == 10
+    assert vsc["tool_calls"] == 10  # 8+2
+    # hours rounded to 2dp; cli is 1.0 (3600s) + 0.5 (1800s default) = 1.5
+    assert cli["hours"] == 1.5
+    assert vsc["hours"] == 0.5
 
 
 def test_longest_streak_three_consecutive_days():

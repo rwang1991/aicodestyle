@@ -281,6 +281,7 @@ def load_profile_payload() -> dict[str, Any]:
         "hour_histogram": ext.hour_histogram,
         "weekday_histogram": ext.weekday_histogram,
         "activity_per_day_last_90": ext.activity_per_day_last_90,
+        "by_client": ext.by_client,
         "first_session_at": ext.first_session_at.isoformat() if ext.first_session_at else None,
         "last_session_at": ext.last_session_at.isoformat() if ext.last_session_at else None,
         "behavior": _build_behavior_block(user_profile),

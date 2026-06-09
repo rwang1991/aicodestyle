@@ -142,3 +142,132 @@ def test_parse_handles_request_without_response_or_text(tmp_path: Path):
     assert ns.turns[0].assistant is None or ns.turns[0].assistant.content == ""
     assert ns.turns[1].assistant is not None
     assert ns.turns[1].assistant.content == "orphan reply"
+
+
+def test_parse_synthesizes_tool_calls_from_tool_invocations(tmp_path: Path):
+    """toolInvocationSerialized chunks should become ToolCall objects."""
+    p = _make_session_file(
+        tmp_path / "chatSessions" / "tools.json",
+        session_id="tools",
+        creation_ms=1_700_000_000_000,
+        last_ms=1_700_000_100_000,
+        requests=[
+            {
+                "requestId": "r0",
+                "message": {"text": "list dbs and edit a file"},
+                "response": [
+                    {"value": "I'll do both."},
+                    {
+                        "kind": "toolInvocationSerialized",
+                        "toolId": "mcp_kusto-mcp_list_databases",
+                        "toolCallId": "tc-1",
+                        "isComplete": True,
+                        "isConfirmed": True,
+                        "resultDetails": {"isError": False, "input": "{}", "output": []},
+                        "toolSpecificData": {"kind": "input", "rawInput": {}},
+                    },
+                    {
+                        "kind": "toolInvocationSerialized",
+                        "toolId": "runInTerminal",
+                        "toolCallId": "tc-2",
+                        "isComplete": True,
+                        "isConfirmed": True,
+                        "resultDetails": {"isError": True, "input": "ls", "output": []},
+                    },
+                ],
+                "modelId": "gpt-5",
+                "timestamp": 1_700_000_050_000,
+                "isCanceled": False,
+            }
+        ],
+    )
+
+    ns = VsCodeCopilotCollector().parse(_discovered(p, session_id="tools"))
+
+    assert len(ns.turns) == 1
+    calls = ns.turns[0].tool_calls
+    assert len(calls) == 2
+    names = [c.tool_name for c in calls]
+    assert "mcp_kusto-mcp_list_databases" in names
+    assert "runInTerminal" in names
+    # success comes from resultDetails.isError (inverted)
+    by_name = {c.tool_name: c for c in calls}
+    assert by_name["mcp_kusto-mcp_list_databases"].success is True
+    assert by_name["runInTerminal"].success is False
+
+
+def test_parse_synthesizes_edit_tool_calls_from_text_edit_groups(tmp_path: Path):
+    """textEditGroup chunks should become 'edit' ToolCall objects with path."""
+    p = _make_session_file(
+        tmp_path / "chatSessions" / "edits.json",
+        session_id="edits",
+        creation_ms=1_700_000_000_000,
+        last_ms=1_700_000_100_000,
+        requests=[
+            {
+                "requestId": "r0",
+                "message": {"text": "fix two files"},
+                "response": [
+                    {"value": "Editing two files."},
+                    {
+                        "kind": "textEditGroup",
+                        "uri": {"fsPath": "C:\\repo\\src\\foo.py"},
+                        "edits": [[{"text": "new", "range": {}}]],
+                        "state": {"applied": 1, "sha1": "abc"},
+                    },
+                    {
+                        "kind": "textEditGroup",
+                        "uri": {"fsPath": "C:\\repo\\src\\bar.py"},
+                        "edits": [[{"text": "more", "range": {}}]],
+                        "state": {"applied": 0},
+                    },
+                ],
+                "modelId": "gpt-5",
+                "timestamp": 1_700_000_050_000,
+                "isCanceled": False,
+            }
+        ],
+    )
+
+    ns = VsCodeCopilotCollector().parse(_discovered(p, session_id="edits"))
+    calls = ns.turns[0].tool_calls
+    edits = [c for c in calls if c.tool_name == "edit"]
+    assert len(edits) == 2
+    paths = sorted(c.arguments.get("path") for c in edits)
+    assert paths == ["C:\\repo\\src\\bar.py", "C:\\repo\\src\\foo.py"]
+    # state.applied >= 1 means success
+    by_path = {c.arguments.get("path"): c for c in edits}
+    assert by_path["C:\\repo\\src\\foo.py"].success is True
+    assert by_path["C:\\repo\\src\\bar.py"].success is False
+
+
+def test_parse_ignores_non_tool_response_chunks(tmp_path: Path):
+    """thinking / undoStop / inlineReference must NOT be counted as tool calls."""
+    p = _make_session_file(
+        tmp_path / "chatSessions" / "noise.json",
+        session_id="noise",
+        creation_ms=1_700_000_000_000,
+        last_ms=1_700_000_100_000,
+        requests=[
+            {
+                "requestId": "r0",
+                "message": {"text": "do work"},
+                "response": [
+                    {"value": "Working..."},
+                    {"kind": "thinking", "value": "internal reasoning"},
+                    {"kind": "undoStop", "id": "u1"},
+                    {"kind": "inlineReference", "inlineReference": {"path": "/x"}},
+                    {"kind": "codeblockUri", "uri": {"fsPath": "/x.py"}},
+                    {"kind": "progressMessage", "content": {"value": "..."}},
+                ],
+                "modelId": "gpt-5",
+                "timestamp": 1_700_000_050_000,
+            }
+        ],
+    )
+
+    ns = VsCodeCopilotCollector().parse(_discovered(p, session_id="noise"))
+    assert ns.turns[0].tool_calls == []
+    # Assistant text only includes 'value' chunks, not thinking/etc.
+    assert ns.turns[0].assistant is not None
+    assert ns.turns[0].assistant.content == "Working..."

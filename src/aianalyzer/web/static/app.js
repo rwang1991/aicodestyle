@@ -81,6 +81,84 @@
     if (charts[id]) { charts[id].destroy(); delete charts[id]; }
   }
 
+  // Comments on signal coverage per client. Surfaces tool-coverage caveats
+  // when VS Code data dominates so users know why some axes may look low.
+  const CLIENT_COVERAGE_NOTES = {
+    "copilot-cli":
+      "Full signal coverage — every prompt, tool call, file edit, terminal " +
+      "run, todo and error is recorded.",
+    "vscode-copilot":
+      "Strong coverage — tool invocations, file edits and terminal runs are " +
+      "recorded. Per-tool-call timestamps and todos are not captured, so " +
+      "'Think time' and 'TODO-driver' may read lower than for Copilot CLI.",
+  };
+
+  function renderDataSources(p) {
+    const section = document.getElementById("data-sources");
+    if (!section) return;
+    const list = document.getElementById("data-sources-list");
+    const note = document.getElementById("data-sources-note");
+    const byClient = (p && p.by_client) || {};
+    const entries = Object.entries(byClient);
+    if (!entries.length) {
+      section.hidden = true;
+      return;
+    }
+    section.hidden = false;
+    // Stable ordering: most sessions first.
+    entries.sort((a, b) => (b[1].sessions || 0) - (a[1].sessions || 0));
+    const totals = entries.reduce(
+      (acc, [, v]) => {
+        acc.sessions += v.sessions || 0;
+        acc.turns += v.turns || 0;
+        acc.tool_calls += v.tool_calls || 0;
+        return acc;
+      },
+      { sessions: 0, turns: 0, tool_calls: 0 }
+    );
+    list.innerHTML = "";
+    for (const [client, v] of entries) {
+      const sessPct = totals.sessions ? (v.sessions / totals.sessions) * 100 : 0;
+      const turnPct = totals.turns ? (v.turns / totals.turns) * 100 : 0;
+      const toolPct = totals.tool_calls ? (v.tool_calls / totals.tool_calls) * 100 : 0;
+      const li = document.createElement("li");
+      li.className = "source-row";
+      li.innerHTML = `
+        <div class="source-head">
+          <span class="source-name">${humanizeClient(client)}</span>
+          <span class="source-share">${Math.round(sessPct)}% of sessions</span>
+        </div>
+        <div class="source-bar"><span style="width:${sessPct.toFixed(1)}%"></span></div>
+        <div class="source-stats">
+          <span><b>${v.sessions.toLocaleString()}</b> sessions</span>
+          <span><b>${v.turns.toLocaleString()}</b> turns
+            <span class="muted">(${turnPct.toFixed(1)}% of all turns)</span></span>
+          <span><b>${Math.round(v.tool_calls).toLocaleString()}</b> tool calls
+            <span class="muted">(${toolPct.toFixed(1)}% of all tool signal)</span></span>
+          <span><b>${(v.hours || 0).toFixed(1)}</b> engaged hours</span>
+        </div>
+        <p class="source-note muted">${CLIENT_COVERAGE_NOTES[client] || "Coverage details unavailable for this client."}</p>
+      `;
+      list.appendChild(li);
+    }
+    // Highlight tool-coverage skew if any client dominates with > 60% of tool calls.
+    const dominant = entries.find(
+      ([, v]) => totals.tool_calls && v.tool_calls / totals.tool_calls > 0.6
+    );
+    if (dominant) {
+      const [client, v] = dominant;
+      const pct = Math.round((v.tool_calls / totals.tool_calls) * 100);
+      note.textContent =
+        `Heads-up: ${pct}% of your tool-call signal comes from ${humanizeClient(client)}. ` +
+        `Behaviour signals that depend on tool calls (Hands-on, Multi-tasker, ` +
+        `tool error rate) are weighted toward how you use that tool.`;
+    } else {
+      note.textContent =
+        "Your tool-call signal is reasonably balanced across clients, so " +
+        "behaviour metrics reflect your overall AI usage style.";
+    }
+  }
+
   function renderHero(p) {
     const primary = (p.primary_archetype || "unknown").replace(/^./, c => c.toUpperCase());
     $("#hero-archetype").textContent = `You are an ${primary}`;
@@ -617,6 +695,7 @@
     try {
       const profile = await fetchJson("/api/profile");
       renderHero(profile);
+      renderDataSources(profile);
       renderBehaviorRadar(profile);
       renderKpis(profile);
       renderLists(profile);

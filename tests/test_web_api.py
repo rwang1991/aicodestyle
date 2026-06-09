@@ -33,6 +33,8 @@ def test_scan_then_profile_end_to_end(tmp_path, monkeypatch):
     assert "axes" in p
     assert "planning" in p["axes"]
     assert "control" in p["axes"]
+    # Empty cache -> by_client is an empty dict (no fake clients).
+    assert p["by_client"] == {}
 
     # Behavior radar payload: six independent trait dimensions, each with a
     # normalized score in [0, 1] and a human-readable help string. With an

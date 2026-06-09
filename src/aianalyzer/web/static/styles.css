@@ -199,6 +199,41 @@ main { padding: 24px; max-width: 1280px; margin: 0 auto; display: flex; flex-dir
 }
 .empty-state-banner p { margin: 8px 0 0; color: var(--muted); }
 
+/* Data sources card — shows the per-client breakdown of where the signals
+   came from, plus a transparency note about coverage differences. */
+.sources-card { padding: 22px 24px; }
+.sources-card h2 { margin: 0 0 6px; font-size: 20px; }
+.sources-list { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 14px; }
+.source-row {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.source-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.source-name { font-weight: 600; font-size: 14px; }
+.source-share { color: var(--accent); font-size: 12px; font-weight: 600; }
+.source-bar {
+  margin: 8px 0 10px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.source-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #6aa6ff);
+  border-radius: 4px;
+}
+.source-stats {
+  display: flex; flex-wrap: wrap; gap: 16px;
+  font-size: 12px; color: var(--muted);
+}
+.source-stats b { color: var(--text); font-weight: 600; }
+.source-note { margin: 8px 0 0; font-size: 11px; line-height: 1.5; }
+.sources-note { margin: 16px 0 0; font-size: 12px; line-height: 1.5; }
+
 /* Behavior signals panel */
 .behavior .behavior-card { padding: 18px; }
 .behavior-help { color: var(--muted); font-size: 12px; margin: 0 0 16px; }

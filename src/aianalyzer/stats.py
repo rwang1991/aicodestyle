@@ -33,6 +33,9 @@ class ExtendedProfile:
     hour_histogram: list[int] = field(default_factory=lambda: [0] * 24)
     weekday_histogram: list[int] = field(default_factory=lambda: [0] * 7)
     activity_per_day_last_90: list[tuple[str, int]] = field(default_factory=list)
+    # Per-client breakdown so the portal can show users where their data
+    # actually came from. Each value is { sessions, turns, hours, tool_calls }.
+    by_client: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
 def _percentile(values: list[float], q: float) -> float:
@@ -127,5 +130,24 @@ def compute_extended_profile(features: Iterable[SessionFeatures]) -> ExtendedPro
     p.top_models = model_totals.most_common(12)
     p.top_file_extensions = ext_totals.most_common(12)
     p.session_type_counts = dict(type_totals)
+
+    # Per-client breakdown of where the data came from. ``tool_calls`` lets
+    # the portal honestly say "X% of your tool-call signals came from
+    # Copilot CLI" so users know if their archetype is skewed by tool
+    # coverage differences across clients.
+    by_client: dict[str, dict[str, float]] = {}
+    for f in fs:
+        bucket = by_client.setdefault(
+            f.client,
+            {"sessions": 0, "turns": 0, "hours": 0.0, "tool_calls": 0},
+        )
+        bucket["sessions"] += 1
+        bucket["turns"] += f.turn_count
+        bucket["hours"] += f.session_duration_sec / 3600.0
+        bucket["tool_calls"] += sum(f.tool_counts.values())
+    # Round hours so the payload is JSON-friendly.
+    for v in by_client.values():
+        v["hours"] = round(v["hours"], 2)
+    p.by_client = by_client
 
     return p
