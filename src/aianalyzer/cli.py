@@ -1,6 +1,9 @@
 """aianalyzer CLI entry point."""
 from __future__ import annotations
 
+import threading
+import time
+import webbrowser
 from pathlib import Path
 from typing import Optional
 
@@ -100,4 +103,35 @@ def report(
 
     console = Console()
     render_report(profile, result, features, console=console)
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Host to bind the portal to."),
+    port: int = typer.Option(8765, help="Port to bind the portal to."),
+    open_browser: bool = typer.Option(True, "--open-browser/--no-open-browser", help="Open the portal in your default browser."),
+) -> None:
+    """Launch the local web portal at http://HOST:PORT/."""
+    import uvicorn
+
+    url = f"http://{host}:{port}/"
+    typer.echo(f"AIAnalyzer portal: {url}")
+
+    if open_browser:
+        def _open() -> None:
+            time.sleep(1.0)
+            try:
+                webbrowser.open(url)
+            except Exception:  # noqa: BLE001
+                pass
+
+        threading.Thread(target=_open, daemon=True).start()
+
+    uvicorn.run(
+        "aianalyzer.web.app:create_app",
+        host=host,
+        port=port,
+        factory=True,
+        log_level="info",
+    )
 
