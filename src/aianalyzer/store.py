@@ -32,7 +32,7 @@ class FeatureStore:
         # Migration: add schema_version column to existing tables
         cols = {row[1] for row in self._con.execute("PRAGMA table_info('features')").fetchall()}
         if "schema_version" not in cols:
-            self._con.execute("ALTER TABLE features ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0")
+            self._con.execute("ALTER TABLE features ADD COLUMN schema_version INTEGER DEFAULT 0")
 
     def has_fresh(self, client: str, session_id: str, mtime: float) -> bool:
         row = self._con.execute(

@@ -54,3 +54,37 @@ def test_store_invalidates_rows_with_older_schema_version(tmp_path: Path):
     # has_fresh should return False for rows with old schema_version
     assert store.has_fresh("copilot-cli", "s1", mtime=1.0) is False, \
         "rows from older schema must be treated as cache miss"
+
+
+def test_store_migrates_legacy_db_without_schema_version_column(tmp_path: Path):
+    """A DB created by an older codebase (no schema_version column) must upgrade cleanly."""
+    import duckdb
+    from aianalyzer.store import FeatureStore
+
+    db_path = tmp_path / "legacy.duckdb"
+    # Simulate a legacy schema (no schema_version column, with a sample row)
+    con = duckdb.connect(str(db_path))
+    con.execute(
+        """
+        CREATE TABLE features (
+            client      VARCHAR NOT NULL,
+            session_id  VARCHAR NOT NULL,
+            mtime       DOUBLE  NOT NULL,
+            json        VARCHAR NOT NULL,
+            PRIMARY KEY (client, session_id)
+        )
+        """
+    )
+    con.execute(
+        "INSERT INTO features VALUES (?, ?, ?, ?)",
+        ["copilot_cli", "legacy-1", 1.0, "{}"],
+    )
+    con.close()
+
+    # Re-opening with the current code must not raise.
+    store = FeatureStore(db_path)
+    # Legacy row got schema_version = 0, so it's invisible to has_fresh (which requires the current SCHEMA_VERSION).
+    assert store.has_fresh("copilot_cli", "legacy-1", mtime=1.0) is False
+    # And it doesn't appear in load_all() either.
+    assert list(store.load_all()) == []
+    store.close()
