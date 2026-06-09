@@ -100,3 +100,91 @@ def test_collector_aborted_turn_flagged(tmp_path: Path):
     )
     session = CopilotCliCollector().parse(discovered)
     assert session.turns[0].aborted is True
+
+
+def test_collector_recovers_cwd_from_session_resume(tmp_path: Path):
+    events_text = textwrap.dedent(
+        """\
+        {"type":"session.start","timestamp":"2026-06-09T10:00:00Z","data":{"sessionId":"s","copilotVersion":"x"}}
+        {"type":"session.resume","timestamp":"2026-06-09T10:00:01Z","data":{"context":{"cwd":"C:/from/resume"}}}
+        {"type":"user.message","timestamp":"2026-06-09T10:00:02Z","data":{"content":"go"}}
+        {"type":"assistant.turn_start","timestamp":"2026-06-09T10:00:03Z","data":{"turnId":"t1"}}
+        {"type":"assistant.message","timestamp":"2026-06-09T10:00:04Z","data":{"messageId":"m","content":"ok","model":"m1"}}
+        {"type":"assistant.turn_end","timestamp":"2026-06-09T10:00:05Z","data":{"turnId":"t1"}}
+        """
+    )
+    events = tmp_path / "events.jsonl"
+    events.write_text(events_text, encoding="utf-8")
+    discovered = DiscoveredSession(
+        client="copilot-cli", session_id="s", root=tmp_path,
+        events_path=events, db_path=None, mtime=events.stat().st_mtime,
+    )
+    session = CopilotCliCollector().parse(discovered)
+    assert session.cwd == "C:/from/resume"
+
+
+def test_collector_recovers_model_from_tool_complete(tmp_path: Path):
+    events_text = textwrap.dedent(
+        """\
+        {"type":"session.start","timestamp":"2026-06-09T10:00:00Z","data":{"sessionId":"s","context":{"cwd":"."},"copilotVersion":"x"}}
+        {"type":"user.message","timestamp":"2026-06-09T10:00:01Z","data":{"content":"go"}}
+        {"type":"assistant.turn_start","timestamp":"2026-06-09T10:00:02Z","data":{"turnId":"t1"}}
+        {"type":"assistant.message","timestamp":"2026-06-09T10:00:03Z","data":{"messageId":"m","content":"","toolRequests":[{"toolCallId":"c1","name":"view","arguments":{}}]}}
+        {"type":"tool.execution_start","timestamp":"2026-06-09T10:00:04Z","data":{"toolCallId":"c1","toolName":"view","arguments":{}}}
+        {"type":"tool.execution_complete","timestamp":"2026-06-09T10:00:05Z","data":{"toolCallId":"c1","success":true,"model":"claude-opus-4.7"}}
+        {"type":"assistant.turn_end","timestamp":"2026-06-09T10:00:06Z","data":{"turnId":"t1"}}
+        """
+    )
+    events = tmp_path / "events.jsonl"
+    events.write_text(events_text, encoding="utf-8")
+    discovered = DiscoveredSession(
+        client="copilot-cli", session_id="s", root=tmp_path,
+        events_path=events, db_path=None, mtime=events.stat().st_mtime,
+    )
+    session = CopilotCliCollector().parse(discovered)
+    assert session.turns[0].assistant.model == "claude-opus-4.7"
+    assert "claude-opus-4.7" in session.models_used
+
+
+def test_reasoning_effort_does_not_leak_backward(tmp_path: Path):
+    events_text = textwrap.dedent(
+        """\
+        {"type":"session.start","timestamp":"2026-06-09T10:00:00Z","data":{"sessionId":"s","context":{"cwd":"."},"copilotVersion":"x"}}
+        {"type":"session.model_change","timestamp":"2026-06-09T10:00:01Z","data":{"newModel":"m1","reasoningEffort":"high"}}
+        {"type":"user.message","timestamp":"2026-06-09T10:00:02Z","data":{"content":"first"}}
+        {"type":"assistant.turn_start","timestamp":"2026-06-09T10:00:03Z","data":{"turnId":"t1"}}
+        {"type":"assistant.message","timestamp":"2026-06-09T10:00:04Z","data":{"messageId":"m","content":"ok","model":"m1"}}
+        {"type":"assistant.turn_end","timestamp":"2026-06-09T10:00:05Z","data":{"turnId":"t1"}}
+        {"type":"session.model_change","timestamp":"2026-06-09T10:00:06Z","data":{"newModel":"m1","reasoningEffort":"low"}}
+        {"type":"user.message","timestamp":"2026-06-09T10:00:07Z","data":{"content":"second"}}
+        {"type":"assistant.turn_start","timestamp":"2026-06-09T10:00:08Z","data":{"turnId":"t2"}}
+        {"type":"assistant.message","timestamp":"2026-06-09T10:00:09Z","data":{"messageId":"m2","content":"ok","model":"m1"}}
+        {"type":"assistant.turn_end","timestamp":"2026-06-09T10:00:10Z","data":{"turnId":"t2"}}
+        """
+    )
+    events = tmp_path / "events.jsonl"
+    events.write_text(events_text, encoding="utf-8")
+    discovered = DiscoveredSession(
+        client="copilot-cli", session_id="s", root=tmp_path,
+        events_path=events, db_path=None, mtime=events.stat().st_mtime,
+    )
+    session = CopilotCliCollector().parse(discovered)
+    # First turn must still see "high" — not "low".
+    assert session.turns[0].assistant.reasoning_effort == "high"
+    assert session.turns[1].assistant.reasoning_effort == "low"
+
+
+def test_collector_handles_real_corpus_without_crash():
+    """Smoke test: parsing every real local session must not crash."""
+    from aianalyzer.discovery import discover_copilot_cli_sessions
+    sessions = list(discover_copilot_cli_sessions())
+    if not sessions:
+        return  # skip if no real corpus present
+    parser = CopilotCliCollector()
+    crashes = []
+    for d in sessions:
+        try:
+            parser.parse(d)
+        except Exception as exc:  # noqa: BLE001
+            crashes.append((d.session_id, type(exc).__name__, str(exc)[:120]))
+    assert not crashes, f"Crashes on real corpus: {crashes[:5]}"

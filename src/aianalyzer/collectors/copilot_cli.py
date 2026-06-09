@@ -63,6 +63,13 @@ class CopilotCliCollector:
                         error=call.get("error"),
                     )
                 )
+            if current_assistant is not None and not current_assistant.model:
+                recovered = next(
+                    (c["model"] for c in current_calls.values() if c.get("model")),
+                    "",
+                )
+                if recovered:
+                    current_assistant = current_assistant.model_copy(update={"model": recovered})
             turns.append(
                 Turn(
                     index=turn_index,
@@ -79,7 +86,7 @@ class CopilotCliCollector:
             current_calls = {}
             current_aborted = False
 
-        for event in events:
+        for idx, event in enumerate(events):
             etype = event.get("type")
             data = event.get("data", {}) or {}
             ts = event.get("ts")
@@ -87,6 +94,12 @@ class CopilotCliCollector:
             if etype == "session.start":
                 ctx = data.get("context") or {}
                 cwd = ctx.get("cwd") or cwd
+            elif etype == "session.resume":
+                if cwd is None:
+                    ctx = data.get("context") or {}
+                    candidate = ctx.get("cwd")
+                    if candidate:
+                        cwd = candidate
             elif etype == "session.model_change":
                 model = data.get("newModel")
                 if model and model not in models_used:
@@ -108,7 +121,7 @@ class CopilotCliCollector:
                     turn_id=str(data.get("turnId") or current_turn_id or ""),
                     content=redact(data.get("content") or ""),
                     model=model,
-                    reasoning_effort=_reasoning_effort_for(events, model),
+                    reasoning_effort=_reasoning_effort_for(events, model, idx),
                     ts=ts,
                 )
             elif etype == "tool.execution_start":
@@ -127,7 +140,15 @@ class CopilotCliCollector:
                 call = current_calls[call_id]
                 call["ts_end"] = ts
                 call["success"] = bool(data.get("success"))
-                call["error"] = data.get("error")
+                raw_error = data.get("error")
+                if raw_error is not None and not isinstance(raw_error, str):
+                    raw_error = str(raw_error)
+                call["error"] = raw_error
+                tc_model = data.get("model")
+                if tc_model:
+                    call["model"] = tc_model
+                    if tc_model not in models_used:
+                        models_used.append(tc_model)
             elif etype == "abort":
                 current_aborted = True
                 _flush_turn()
@@ -177,14 +198,15 @@ def _last_ts(events: list[dict]):
     return None
 
 
-def _reasoning_effort_for(events: list[dict], model: str):
-    """Return the most recent reasoning effort applicable to `model`."""
+def _reasoning_effort_for(events: list[dict], model: str, before_idx: int):
+    """Return the most recent reasoning effort applicable to `model` BEFORE `before_idx`."""
     last_effort = None
-    for e in events:
+    for i in range(before_idx):
+        e = events[i]
         if e.get("type") == "session.model_change":
-            data = e.get("data") or {}
-            if data.get("newModel") == model or model == "":
-                effort = data.get("reasoningEffort")
+            d = e.get("data") or {}
+            if d.get("newModel") == model or model == "":
+                effort = d.get("reasoningEffort")
                 if effort in {"low", "medium", "high", "xhigh"}:
                     last_effort = effort
     return last_effort
