@@ -78,27 +78,49 @@
       axesEl.appendChild(div);
     }
 
-    renderArchetypeRadar(p);
+    renderQuadrantMap(p);
   }
 
-  function renderArchetypeRadar(p) {
-    destroyChart("chart-archetype-radar");
-    const aff = p.archetype_affinity || [];
-    if (!aff.length) return;
-    const labels = aff.map(a => a.label);
-    const data = aff.map(a => a.score);
-    charts["chart-archetype-radar"] = new Chart($("#chart-archetype-radar"), {
+  function renderQuadrantMap(p) {
+    const dot = $("#quadrant-dot");
+    if (!dot) return;
+    // axes.planning and axes.control are both in [-1, +1]. Map planning -> Y
+    // (top is positive) and control -> X (right is positive) so the four
+    // corner labels match the canonical archetype grid:
+    //   top-left  = Pilot      (planning +, control -)
+    //   top-right = Architect  (planning +, control +)
+    //   bot-left  = Vibe Coder (planning -, control -)
+    //   bot-right = Tinkerer   (planning -, control +)
+    const planning = p.axes?.planning ?? 0;
+    const control = p.axes?.control ?? 0;
+    const xPct = 50 + control * 50;           // -1 -> 0%, +1 -> 100%
+    const yPct = 50 - planning * 50;          // +1 -> 0% (top), -1 -> 100%
+    dot.style.left = xPct + "%";
+    dot.style.top = yPct + "%";
+    dot.title =
+      `You: planning ${planning >= 0 ? "+" : ""}${planning.toFixed(2)}, ` +
+      `control ${control >= 0 ? "+" : ""}${control.toFixed(2)}`;
+  }
+
+  function renderBehaviorRadar(p) {
+    destroyChart("chart-behavior-radar");
+    const radar = p.behavior_radar || [];
+    if (!radar.length) return;
+    const labels = radar.map(r => r.label);
+    const data = radar.map(r => r.score);
+    charts["chart-behavior-radar"] = new Chart($("#chart-behavior-radar"), {
       type: "radar",
       data: {
         labels,
         datasets: [{
-          label: "Affinity (0–1)",
+          label: "You (0–1)",
           data,
-          backgroundColor: "rgba(88,166,255,0.25)",
+          backgroundColor: "rgba(88,166,255,0.28)",
           borderColor: "#58a6ff",
           borderWidth: 2,
           pointBackgroundColor: "#58a6ff",
-          pointRadius: 4,
+          pointRadius: 5,
+          pointHoverRadius: 7,
         }],
       },
       options: {
@@ -108,7 +130,14 @@
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx) => `${ctx.label}: ${(ctx.parsed.r * 100).toFixed(0)}%`,
+              title: (ctx) => ctx[0].label,
+              label: (ctx) => {
+                const row = radar[ctx.dataIndex];
+                return [
+                  `Score: ${(ctx.parsed.r * 100).toFixed(0)}%  (raw ${row.raw} / ${row.ceiling})`,
+                ];
+              },
+              afterLabel: (ctx) => radar[ctx.dataIndex].help,
             },
           },
         },
@@ -129,6 +158,23 @@
         },
       },
     });
+
+    const legend = $("#behavior-radar-legend");
+    legend.innerHTML = "";
+    for (const row of radar) {
+      const li = document.createElement("li");
+      const pct = Math.round((row.score || 0) * 100);
+      li.innerHTML = `
+        <div class="legend-row">
+          <span class="legend-dot"></span>
+          <span class="legend-label">${row.label}</span>
+          <span class="legend-score">${pct}%</span>
+        </div>
+        <div class="legend-help">${row.help}</div>
+        <div class="legend-raw">raw value: <b>${row.raw}</b> &nbsp;·&nbsp; full scale at <b>${row.ceiling}</b></div>
+      `;
+      legend.appendChild(li);
+    }
   }
 
   // KPI metadata: every card declares its label, unit, tooltip and how to
@@ -504,6 +550,7 @@
     try {
       const profile = await fetchJson("/api/profile");
       renderHero(profile);
+      renderBehaviorRadar(profile);
       renderKpis(profile);
       renderLists(profile);
       renderCharts(profile);

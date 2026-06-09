@@ -61,33 +61,51 @@ def _confidence(planning: float, control: float) -> float:
     return min(1.0, (abs(planning) + abs(control)) / 2.0)
 
 
-# Ideal direction of each archetype in (planning, control) space.
-# Used to project a user's score onto each quadrant.
-_ARCHETYPE_DIRECTIONS: list[tuple[str, str, int, int]] = [
-    ("architect", "Architect", +1, +1),
-    ("pilot", "Pilot", +1, -1),
-    ("tinkerer", "Tinkerer", -1, +1),
-    ("vibe-coder", "Vibe Coder", -1, -1),
+# Six independent traits that produce a real radar shape (unlike projecting
+# the four archetype quadrants onto themselves, which always degenerates to
+# at most two non-zero spokes). Each tuple is:
+#   (signal, label, normalizer_max, help)
+# - ``signal`` matches a UserProfile attribute (or "todo_density", computed
+#   on the fly in ``_signal_value``).
+# - ``normalizer_max`` rescales the raw value to [0, 1]. Pulled from
+#   weights.yaml where possible so the radar matches what the classifier sees;
+#   ``parallel_tool_call_rate`` is already a ratio so it uses 1.0.
+_BEHAVIOR_RADAR_DIMS: list[tuple[str, str, float, str]] = [
+    ("planning_language_ratio", "Planner", 0.6,
+     "How often your prompts use planning words like 'plan', 'design', 'first'. High = you talk through the approach first."),
+    ("question_ratio", "Questioner", 0.6,
+     "Share of prompts that ask a question instead of giving an order. High = you check before acting."),
+    ("todo_density", "TODO-driver", 2.0,
+     "Average explicit TODO items you write per session. High = you decompose work into a list."),
+    ("tool_diversity", "Hands-on", 2.0,
+     "Distinct tool types you invoke per session. High = you reach for many tools yourself rather than letting the AI act alone."),
+    ("thinks_before_prompt_sec_avg", "Deliberator", 60.0,
+     "Mean seconds between an AI reply and your next prompt (capped at 5 min per gap). High = you pause to read and think."),
+    ("parallel_tool_call_rate", "Multi-tasker", 1.0,
+     "Share of turns where you issue two or more tool calls in parallel. High = you fan work out simultaneously."),
 ]
 
 
-def _archetype_affinity(planning: float, control: float) -> list[dict[str, Any]]:
-    """Project (planning, control) onto each of the 4 archetype quadrants.
+def _build_behavior_radar(profile: UserProfile) -> list[dict[str, Any]]:
+    """Return one entry per spoke of the 'behavior shape' radar.
 
-    Score formula: ``alignment = (sign_p * P + sign_c * C) / 2``, clamped to
-    ``[0, 1]``. The dominant archetype reaches 1.0 when the user's point sits
-    exactly at the (+/- 1, +/- 1) corner of that quadrant; the opposite
-    archetype always reads 0.0. This is what the radar chart on the portal
-    consumes.
+    Each entry exposes ``score`` in [0, 1] (the radius the chart plots),
+    ``raw`` (the un-normalized value, for tooltips), and ``help`` (one-line
+    description) so the front-end can render explanations without duplicating
+    knowledge of every signal.
     """
     out: list[dict[str, Any]] = []
-    for key, label, sp, sc in _ARCHETYPE_DIRECTIONS:
-        score = (sp * planning + sc * control) / 2.0
+    for signal, label, ceiling, help_text in _BEHAVIOR_RADAR_DIMS:
+        raw = _signal_value(profile, signal)
+        score = 0.0 if ceiling <= 0 else max(0.0, min(1.0, raw / ceiling))
         out.append(
             {
-                "key": key,
+                "name": signal,
                 "label": label,
-                "score": round(max(0.0, min(1.0, score)), 3),
+                "score": round(score, 3),
+                "raw": round(raw, 3),
+                "ceiling": ceiling,
+                "help": help_text,
             }
         )
     return out
@@ -211,9 +229,7 @@ def load_profile_payload() -> dict[str, Any]:
             "planning": round(classification.planning_score, 3),
             "control": round(classification.control_score, 3),
         },
-        "archetype_affinity": _archetype_affinity(
-            classification.planning_score, classification.control_score
-        ),
+        "behavior_radar": _build_behavior_radar(user_profile),
         "totals": {
             "sessions": ext.total_sessions,
             "turns": ext.total_turns,

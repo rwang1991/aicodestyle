@@ -24,3 +24,4 @@ htmlcov/
 
 # AIAnalyzer local cache
 .aianalyzer/
+.commitmsg

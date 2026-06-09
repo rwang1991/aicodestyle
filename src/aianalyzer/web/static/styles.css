@@ -31,18 +31,86 @@ main { padding: 24px; max-width: 1280px; margin: 0 auto; display: flex; flex-dir
 .card .card-sub { color: var(--muted); font-size: 12px; margin: -2px 0 10px; }
 .card .unit { color: var(--muted); font-size: 12px; font-weight: 400; }
 
-/* Hero with side-by-side radar */
-.hero-card { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
-  gap: 24px; align-items: center; padding: 28px; }
+/* Hero with side-by-side quadrant map */
+.hero-card { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr);
+  gap: 28px; align-items: center; padding: 28px; }
 .hero-text h1 { margin: 0 0 8px; font-size: 30px; }
 .hero-text p { margin: 0 0 8px; color: var(--muted); }
-.hero-radar { display: flex; flex-direction: column; align-items: center; }
-.hero-radar canvas { width: 100% !important; max-width: 380px; height: 320px !important; }
-.hero-radar-caption { color: var(--muted); font-size: 11px; text-align: center;
-  margin-top: 8px; max-width: 360px; }
+.hero-map { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.hero-map-caption { color: var(--muted); font-size: 11px; text-align: center;
+  max-width: 360px; line-height: 1.5; }
 @media (max-width: 820px) { .hero-card { grid-template-columns: 1fr; } }
 
+/* Quadrant map - 2D scatter of (control, planning) with the 4 archetypes
+   labelled in their quadrants. Pure CSS / DOM, no Chart.js. */
+.quadrant-map { position: relative; width: 100%; max-width: 360px; aspect-ratio: 1 / 1;
+  background: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(63,185,113,0.06));
+  border: 1px solid var(--border); border-radius: 12px; }
+.quadrant-map .qm-grid { position: absolute; inset: 0; pointer-events: none; }
+.quadrant-map .qm-axis-x { position: absolute; left: 0; right: 0; top: 50%;
+  height: 1px; background: rgba(154,164,175,0.45); }
+.quadrant-map .qm-axis-y { position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 1px; background: rgba(154,164,175,0.45); }
+.quadrant-map .qm-corner { position: absolute; font-weight: 700; font-size: 13px;
+  padding: 6px 10px; border-radius: 6px; background: rgba(14,17,23,0.85);
+  color: var(--accent); border: 1px solid var(--border); pointer-events: none;
+  white-space: nowrap; }
+.quadrant-map .qm-tl { top: 8px; left: 8px; }
+.quadrant-map .qm-tr { top: 8px; right: 8px; color: var(--good); border-color: rgba(63,185,113,0.5); }
+.quadrant-map .qm-bl { bottom: 8px; left: 8px; color: var(--warn); border-color: rgba(210,153,34,0.5); }
+.quadrant-map .qm-br { bottom: 8px; right: 8px; }
+.quadrant-map .qm-axis-label { position: absolute; color: var(--muted);
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  pointer-events: none; }
+.quadrant-map .qm-x-pos { right: 6px; top: calc(50% + 6px); }
+.quadrant-map .qm-x-neg { left: 6px; top: calc(50% + 6px); }
+.quadrant-map .qm-y-pos { left: calc(50% + 8px); top: 4px; }
+.quadrant-map .qm-y-neg { left: calc(50% + 8px); bottom: 4px; }
+.quadrant-dot { position: absolute; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); border: 3px solid #0e1117;
+  transform: translate(-50%, -50%); transition: top 0.6s ease, left 0.6s ease;
+  box-shadow: 0 0 0 0 rgba(88,166,255,0.6); animation: pulse 2.4s infinite; z-index: 2; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(88,166,255,0.55); }
+  70% { box-shadow: 0 0 0 14px rgba(88,166,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(88,166,255,0); }
+}
+
+/* Axes-explainer collapsible */
+.axes-explainer { margin: 12px 0 6px; }
+.axes-explainer summary { cursor: pointer; color: var(--accent); font-size: 13px;
+  padding: 6px 0; user-select: none; }
+.axes-explainer summary::marker { color: var(--accent); }
+.axes-explainer-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px; margin-top: 10px; padding: 12px; background: #0a0e14;
+  border: 1px solid var(--border); border-radius: 8px; }
+.axes-explainer-body h4 { margin: 0 0 6px; font-size: 12px; color: var(--accent);
+  text-transform: uppercase; letter-spacing: 0.06em; }
+.axes-explainer-body p { color: var(--muted); font-size: 12px; margin: 0 0 8px; line-height: 1.5; }
+.axis-pole { display: inline-block; width: 18px; height: 18px; border-radius: 4px;
+  text-align: center; font-weight: 700; line-height: 18px; margin-right: 4px; }
+.axis-pole.pos { background: var(--good); color: #0a0e14; }
+.axis-pole.neg { background: var(--warn); color: #0a0e14; }
+
 .axis .axis-sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+/* Behavior shape (radar) card */
+.shape-card { padding: 24px; }
+.shape-header h2 { margin: 0 0 6px; font-size: 22px; }
+.shape-body { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, 1fr);
+  gap: 24px; align-items: center; margin-top: 16px; }
+.shape-canvas-wrap { position: relative; width: 100%; }
+.shape-canvas-wrap canvas { width: 100% !important; height: 380px !important; max-height: 420px; }
+.shape-legend { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.shape-legend li { background: #0a0e14; border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; }
+.legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.legend-label { font-weight: 600; flex: 1; }
+.legend-score { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 700; }
+.legend-help { color: var(--muted); font-size: 11px; line-height: 1.4; margin-bottom: 4px; }
+.legend-raw { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+@media (max-width: 820px) { .shape-body { grid-template-columns: 1fr; } }
 
 /* Narrative — promoted to second position with letter-style treatment */
 .narrative-card { position: relative; padding: 24px; border-left: 4px solid var(--accent);

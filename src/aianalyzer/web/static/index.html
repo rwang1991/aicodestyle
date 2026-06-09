@@ -22,14 +22,85 @@
         <h1 id="hero-archetype">Loading your profile…</h1>
         <p id="hero-summary"></p>
         <div id="hero-tags" class="tags"></div>
+        <div id="axes-explainer" class="axes-explainer">
+          <details>
+            <summary>What do <b>planning</b> and <b>control</b> mean?</summary>
+            <div class="axes-explainer-body">
+              <div>
+                <h4>Planning axis</h4>
+                <p>
+                  Measures whether you <b>think before you type</b>. Computed from
+                  how often your prompts use planner-words ("plan", "design",
+                  "first"), mention tests or specs, create explicit TODOs, ask
+                  questions instead of giving orders, and how long you pause between
+                  the AI's reply and your next prompt.
+                </p>
+                <p>
+                  <span class="axis-pole pos">+</span> = Planner (you specify first)
+                  &nbsp;·&nbsp;
+                  <span class="axis-pole neg">−</span> = Doer (you act first)
+                </p>
+              </div>
+              <div>
+                <h4>Control axis</h4>
+                <p>
+                  Measures how <b>hands-on</b> you stay while the AI is working.
+                  Computed from how many distinct tools you invoke, files you touch
+                  per turn, how often you accept the AI's first response without
+                  revisions (inverted), and how often you have to retry.
+                </p>
+                <p>
+                  <span class="axis-pole pos">+</span> = Hands-on (you steer the tools)
+                  &nbsp;·&nbsp;
+                  <span class="axis-pole neg">−</span> = Delegator (you let the AI run)
+                </p>
+              </div>
+            </div>
+          </details>
+        </div>
         <div id="hero-axes" class="axes"></div>
       </div>
-      <div class="hero-radar">
-        <canvas id="chart-archetype-radar" aria-label="Archetype affinity radar"></canvas>
-        <div class="hero-radar-caption">
-          Affinity to each of the four archetypes, projected from your
-          planning and control axes (1.0 = pure archetype).
+      <div class="hero-map">
+        <div id="quadrant-map" class="quadrant-map" aria-label="Archetype quadrant map">
+          <span class="qm-axis-label qm-x-pos" title="More hands-on, you steer the tools">Hands-on →</span>
+          <span class="qm-axis-label qm-x-neg" title="More hands-off, you let the AI act">← Delegator</span>
+          <span class="qm-axis-label qm-y-pos" title="More planning, you specify first">↑ Planner</span>
+          <span class="qm-axis-label qm-y-neg" title="More doing, you act first">↓ Doer</span>
+          <span class="qm-corner qm-tl" title="Planner + Delegator">Pilot</span>
+          <span class="qm-corner qm-tr" title="Planner + Hands-on">Architect</span>
+          <span class="qm-corner qm-bl" title="Doer + Delegator">Vibe Coder</span>
+          <span class="qm-corner qm-br" title="Doer + Hands-on">Tinkerer</span>
+          <div class="qm-grid">
+            <div class="qm-axis-x"></div>
+            <div class="qm-axis-y"></div>
+          </div>
+          <div id="quadrant-dot" class="quadrant-dot" title="Your position"></div>
         </div>
+        <div class="hero-map-caption">
+          You sit between the four archetypes on the
+          (<b>control</b>, <b>planning</b>) plane. The closer you are to a
+          corner, the purer that archetype.
+        </div>
+      </div>
+    </section>
+
+    <section id="behavior-shape" class="card shape-card">
+      <div class="shape-header">
+        <div>
+          <div class="card-eyebrow">Your behavior shape</div>
+          <h2>Six traits that make up your AI style</h2>
+          <p class="card-sub">
+            Each spoke is one independent behavior signal, rescaled so
+            <b>1.0 = the level the classifier treats as "fully expressed"</b>.
+            Hover any label for the exact value and the formula behind it.
+          </p>
+        </div>
+      </div>
+      <div class="shape-body">
+        <div class="shape-canvas-wrap">
+          <canvas id="chart-behavior-radar" aria-label="Behavior shape radar"></canvas>
+        </div>
+        <ul id="behavior-radar-legend" class="shape-legend"></ul>
       </div>
     </section>
 
