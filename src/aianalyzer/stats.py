@@ -63,7 +63,7 @@ def compute_extended_profile(features: Iterable[SessionFeatures]) -> ExtendedPro
     p.total_hours = sum(f.session_duration_sec for f in fs) / 3600.0
     p.avg_turns_per_session = p.total_turns / p.total_sessions
     p.avg_session_minutes = (p.total_hours * 60.0) / p.total_sessions
-    p.acceptance_rate = 1.0 - (sum(f.abort_rate for f in fs) / p.total_sessions)
+    p.acceptance_rate = max(0.0, min(1.0, 1.0 - (sum(f.abort_rate for f in fs) / p.total_sessions)))
 
     starts = [f.started_at for f in fs if f.started_at is not None]
     if starts:
