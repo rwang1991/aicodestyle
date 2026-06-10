@@ -33,6 +33,12 @@ class ExtendedProfile:
     hour_histogram: list[int] = field(default_factory=lambda: [0] * 24)
     weekday_histogram: list[int] = field(default_factory=lambda: [0] * 7)
     activity_per_day_last_90: list[tuple[str, int]] = field(default_factory=list)
+    # 7x24 matrix of session-start counts. Rows = weekday (0=Mon..6=Sun),
+    # cols = local hour 0..23. The portal renders this as a heatmap so users
+    # can see their weekly rhythm at a glance.
+    weekday_hour_matrix: list[list[int]] = field(
+        default_factory=lambda: [[0] * 24 for _ in range(7)]
+    )
     # Per-client breakdown so the portal can show users where their data
     # actually came from. Each value is { sessions, turns, hours, tool_calls }.
     by_client: dict[str, dict[str, float]] = field(default_factory=dict)
@@ -55,6 +61,19 @@ class ExtendedProfile:
     weekend_session_pct: float = 0.0
     top_first_words: list[tuple[str, int]] = field(default_factory=list)
 
+    # Phase D additions: peak weekday-hour cell, off-peak share, model tiers.
+    # `peak_cell` = (weekday, hour) with the most session starts. `off_peak`
+    # = fraction of sessions started outside Mon-Fri 09:00-18:00 local time.
+    peak_cell_weekday: int | None = None
+    peak_cell_hour: int | None = None
+    peak_cell_count: int = 0
+    off_peak_session_pct: float = 0.0
+    # Counter of "Premium"/"Standard"/"Fast"/"Other" turn counts across all
+    # sessions, derived from `top_models`. Lets the portal render a model-tier
+    # donut so users see whether they reach for the heaviest models or balance
+    # cost vs power.
+    model_tier_counts: dict[str, int] = field(default_factory=dict)
+
 
 def _percentile(values: list[float], q: float) -> float:
     if not values:
@@ -71,6 +90,29 @@ def _ext(path: str) -> str | None:
     if "." not in last or last.startswith("."):
         return None
     return "." + last.rsplit(".", 1)[-1].lower()
+
+
+def _model_tier(model: str) -> str:
+    """Classify a model name string into a coarse capability tier.
+
+    The strings come from many providers (Anthropic direct, Copilot proxy,
+    OpenAI direct) and use inconsistent naming. We normalise lower-case and
+    match keywords. Unknown models fall into "Other".
+    """
+    if not model:
+        return "Other"
+    m = model.lower()
+    # Fast variants always win — a "gpt-5.4-mini" is still small/cheap even
+    # though its family is premium. Check this bucket first.
+    if "haiku" in m or "mini" in m or "flash" in m or "nano" in m:
+        return "Fast"
+    # Premium = heavyweight reasoning models (Opus, GPT-5.5/5.4, Codex-Max).
+    if "opus" in m or "gpt-5.5" in m or "gpt-5.4" in m or "codex-max" in m:
+        return "Premium"
+    # Standard = mid-tier daily drivers (Sonnet, GPT-4o, GPT-5, default Codex).
+    if "sonnet" in m or "gpt-4o" in m or "gpt-5" in m or "codex" in m or "claude-3.5" in m:
+        return "Standard"
+    return "Other"
 
 
 def compute_extended_profile(features: Iterable[SessionFeatures]) -> ExtendedProfile:
@@ -142,6 +184,8 @@ def compute_extended_profile(features: Iterable[SessionFeatures]) -> ExtendedPro
             p.hour_histogram[f.started_hour_local] += 1
         if 0 <= f.started_weekday <= 6:
             p.weekday_histogram[f.started_weekday] += 1
+        if 0 <= f.started_weekday <= 6 and 0 <= f.started_hour_local <= 23:
+            p.weekday_hour_matrix[f.started_weekday][f.started_hour_local] += 1
 
     p.top_tools = tool_totals.most_common(12)
     p.top_projects = project_totals.most_common(12)
@@ -223,5 +267,28 @@ def compute_extended_profile(features: Iterable[SessionFeatures]) -> ExtendedPro
     for f in fs:
         fw_counter.update(f.first_words)
     p.top_first_words = fw_counter.most_common(5)
+
+    # Phase D: peak weekday-hour cell + off-peak session share.
+    best_cell = (0, 0, 0)  # (count, weekday, hour)
+    for wd in range(7):
+        for hr in range(24):
+            c = p.weekday_hour_matrix[wd][hr]
+            if c > best_cell[0]:
+                best_cell = (c, wd, hr)
+    if best_cell[0] > 0:
+        p.peak_cell_count = best_cell[0]
+        p.peak_cell_weekday = best_cell[1]
+        p.peak_cell_hour = best_cell[2]
+
+    def _is_off_peak(f: SessionFeatures) -> bool:
+        return f.started_weekday >= 5 or f.started_hour_local < 9 or f.started_hour_local >= 18
+
+    p.off_peak_session_pct = sum(1 for f in fs if _is_off_peak(f)) / len(fs)
+
+    # Phase D: model tier counts (Premium/Standard/Fast/Other).
+    tier_counts: Counter[str] = Counter()
+    for model, count in model_totals.items():
+        tier_counts[_model_tier(model)] += count
+    p.model_tier_counts = dict(tier_counts)
 
     return p

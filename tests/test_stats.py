@@ -230,3 +230,79 @@ def test_empty_profile_has_zeroed_prompt_aggregates():
     assert p.peak_day_date is None
     assert p.weekend_session_pct == 0.0
     assert p.top_first_words == []
+
+
+# ---------------------------------------------------------------------------
+# Phase D — weekday-hour matrix, off-peak share, model tier classification
+# ---------------------------------------------------------------------------
+
+def test_weekday_hour_matrix_buckets_by_local_weekday_and_hour():
+    fs = [
+        _sf(started_weekday=0, started_hour_local=9),   # Mon 9
+        _sf(started_weekday=0, started_hour_local=9),   # Mon 9 again
+        _sf(started_weekday=2, started_hour_local=14),  # Wed 14
+        _sf(started_weekday=6, started_hour_local=23),  # Sun 23
+    ]
+    p = compute_extended_profile(fs)
+    assert p.weekday_hour_matrix[0][9] == 2
+    assert p.weekday_hour_matrix[2][14] == 1
+    assert p.weekday_hour_matrix[6][23] == 1
+    assert p.weekday_hour_matrix[3][10] == 0  # empty cell
+
+
+def test_peak_cell_picks_modal_weekday_hour():
+    fs = [_sf(started_weekday=2, started_hour_local=9) for _ in range(5)]
+    fs += [_sf(started_weekday=3, started_hour_local=14) for _ in range(2)]
+    p = compute_extended_profile(fs)
+    assert p.peak_cell_weekday == 2
+    assert p.peak_cell_hour == 9
+    assert p.peak_cell_count == 5
+
+
+def test_peak_cell_is_none_when_no_sessions():
+    p = compute_extended_profile([])
+    assert p.peak_cell_weekday is None
+    assert p.peak_cell_hour is None
+    assert p.peak_cell_count == 0
+
+
+def test_off_peak_session_pct_counts_weekends_and_outside_9_to_18():
+    fs = [
+        _sf(started_weekday=0, started_hour_local=10),  # Mon 10 — peak
+        _sf(started_weekday=1, started_hour_local=14),  # Tue 14 — peak
+        _sf(started_weekday=2, started_hour_local=8),   # Wed 08 — off-peak
+        _sf(started_weekday=3, started_hour_local=19),  # Thu 19 — off-peak
+        _sf(started_weekday=5, started_hour_local=14),  # Sat 14 — off-peak
+        _sf(started_weekday=6, started_hour_local=10),  # Sun 10 — off-peak
+    ]
+    p = compute_extended_profile(fs)
+    assert p.off_peak_session_pct == pytest.approx(4 / 6)
+
+
+def test_model_tier_counts_classify_premium_standard_fast():
+    fs = [
+        _sf(models_used={"claude-opus-4.7-xhigh": 100, "claude-haiku-4.5": 5}),
+        _sf(models_used={"copilot/gpt-5-codex": 50, "copilot/gpt-5.5": 20}),
+        _sf(models_used={"claude-sonnet-4.6": 30, "made-up-model": 7}),
+    ]
+    p = compute_extended_profile(fs)
+    tiers = p.model_tier_counts
+    # Opus + 5.5 -> Premium = 100 + 20 = 120
+    assert tiers.get("Premium") == 120
+    # Sonnet + GPT-5-codex -> Standard = 30 + 50 = 80
+    assert tiers.get("Standard") == 80
+    # Haiku -> Fast = 5
+    assert tiers.get("Fast") == 5
+    # Unknown -> Other = 7
+    assert tiers.get("Other") == 7
+
+
+def test_model_tier_helper_handles_edge_cases():
+    from aianalyzer.stats import _model_tier
+    assert _model_tier("") == "Other"
+    assert _model_tier("CLAUDE-OPUS-4.7") == "Premium"
+    assert _model_tier("gpt-5.5") == "Premium"
+    assert _model_tier("gpt-5.4-mini") == "Fast"  # mini beats standard
+    assert _model_tier("claude-sonnet-4.5") == "Standard"
+    assert _model_tier("copilot/gpt-5-codex") == "Standard"
+    assert _model_tier("totally-unknown") == "Other"

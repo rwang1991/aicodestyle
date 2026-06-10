@@ -142,6 +142,114 @@
       "'Think time' and 'TODO-driver' may read lower than for Copilot CLI.",
   };
 
+  // 7×24 weekday-hour heatmap. matrix[weekday][hour] = sessions started.
+  function renderWeekHourHeatmap(matrix, peak) {
+    const root = document.getElementById("weekhour-heatmap");
+    if (!root) return;
+    root.innerHTML = "";
+    const peakEl = document.getElementById("weekhour-peak");
+    if (peakEl) peakEl.textContent = "";
+    if (!Array.isArray(matrix) || matrix.length !== 7) return;
+
+    let max = 0;
+    for (let d = 0; d < 7; d++) {
+      for (let h = 0; h < 24; h++) {
+        const v = matrix[d][h] || 0;
+        if (v > max) max = v;
+      }
+    }
+    const bucket = (n) => {
+      if (!n || n <= 0) return 0;
+      if (max <= 1) return 4;
+      return Math.min(4, Math.max(1, Math.ceil((n / max) * 4)));
+    };
+    const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+    // Row-major: each row is one weekday (Mon..Sun), 24 cells across.
+    for (let d = 0; d < 7; d++) {
+      for (let h = 0; h < 24; h++) {
+        const c = matrix[d][h] || 0;
+        const cell = document.createElement("div");
+        cell.className = "weekhour-cell";
+        cell.dataset.level = String(bucket(c));
+        const hourLabel = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+        cell.title = `${dayNames[d]} ${hourLabel}: ${c} session${c === 1 ? "" : "s"}`;
+        if (peak && peak.weekday === d && peak.hour === h && peak.count > 0) {
+          cell.classList.add("peak");
+        }
+        root.appendChild(cell);
+      }
+    }
+    if (peak && peakEl && peak.count > 0 && peak.weekday != null && peak.hour != null) {
+      const h = peak.hour;
+      const hourLabel = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+      peakEl.textContent = `Hot spot: ${dayNames[peak.weekday]} ${hourLabel} — ${peak.count} sessions.`;
+    }
+  }
+
+  const MODEL_TIER_COLORS = {
+    Premium: "#a371f7",
+    Standard: "#58a6ff",
+    Fast: "#3fb950",
+    Other: "#8b949e",
+  };
+  const MODEL_TIER_ORDER = ["Premium", "Standard", "Fast", "Other"];
+
+  function renderModelTier(counts) {
+    const canvas = document.getElementById("chart-model-tier");
+    const legend = document.getElementById("model-tier-legend");
+    if (!canvas || !legend) return;
+    destroyChart("chart-model-tier");
+    legend.innerHTML = "";
+    if (!counts || typeof counts !== "object") return;
+
+    const labels = MODEL_TIER_ORDER.filter((k) => (counts[k] || 0) > 0);
+    if (labels.length === 0) return;
+    const data = labels.map((k) => counts[k]);
+    const colors = labels.map((k) => MODEL_TIER_COLORS[k] || "#8b949e");
+    const total = data.reduce((a, b) => a + b, 0);
+
+    charts["chart-model-tier"] = new Chart(canvas, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: colors,
+          borderColor: "rgba(13,17,23,1)",
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "62%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const v = ctx.parsed;
+                const pct = total > 0 ? Math.round((v / total) * 100) : 0;
+                return `${ctx.label}: ${v.toLocaleString()} turns (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    for (let i = 0; i < labels.length; i++) {
+      const li = document.createElement("li");
+      const pct = total > 0 ? Math.round((data[i] / total) * 100) : 0;
+      li.innerHTML =
+        `<span class="swatch" style="background:${colors[i]}"></span>` +
+        `<span class="tier-name">${labels[i]}</span>` +
+        `<span class="pct">${data[i].toLocaleString()} turns · ${pct}%</span>`;
+      legend.appendChild(li);
+    }
+  }
+
   function renderDataSources(p) {
     const section = document.getElementById("data-sources");
     if (!section) return;
@@ -269,7 +377,12 @@
     card.classList.remove("hidden");
     const glyphEl = card.querySelector(".personality-glyph");
     if (glyphEl) {
-      glyphEl.textContent = personality.archetype_glyph || "✦";
+      const glyph = personality.archetype_glyph || "";
+      if (glyph.trim().startsWith("<svg")) {
+        glyphEl.innerHTML = glyph;
+      } else {
+        glyphEl.textContent = glyph;
+      }
       glyphEl.dataset.archetype = personality.archetype_key || "newcomer";
       glyphEl.setAttribute("aria-label", `${personality.nickname || "Profile"} avatar`);
     }
@@ -550,6 +663,9 @@
 
     const activity = p.activity_per_day_last_90 || [];
     renderActivityHeatmap(activity);
+
+    renderWeekHourHeatmap(p.weekday_hour_matrix, p.peak_cell);
+    renderModelTier(p.model_tier_counts);
 
     const hourHist = p.hour_histogram || [];
     if (hourHist.length === 24) {

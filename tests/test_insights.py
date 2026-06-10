@@ -213,7 +213,7 @@ def test_handles_empty_session_list():
 def test_newcomer_archetype_key_and_glyph_when_no_sessions():
     p = compute_personality(UserProfile(), [])
     assert p.archetype_key == "newcomer"
-    assert p.archetype_glyph == "✦"
+    assert "<svg" in p.archetype_glyph
 
 
 def test_archetype_key_and_glyph_match_classification():
@@ -223,9 +223,11 @@ def test_archetype_key_and_glyph_match_classification():
         file_reference_rate=0.6,
         accept_and_go_ratio=0.05,
     ), [_feat()])
-    # Whatever the classifier picks, key + glyph must be one of the known set.
+    # Whatever the classifier picks, key must be a known archetype slug.
     assert p.archetype_key in {"architect", "pilot", "tinkerer", "vibe-coder"}
-    assert p.archetype_glyph in {"◈", "➤", "⚙", "♪"}
+    # Glyph is always an SVG markup string (concrete icon).
+    assert "<svg" in p.archetype_glyph
+    assert "</svg>" in p.archetype_glyph
 
 
 def test_streak_badge_appears_when_longest_streak_meets_threshold():

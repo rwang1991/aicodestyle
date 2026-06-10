@@ -30,7 +30,7 @@ class AIPersonality(BaseModel):
     nickname: str
     tagline: str
     archetype_key: str = "newcomer"  # "architect" | "pilot" | "tinkerer" | "vibe-coder" | "newcomer"
-    archetype_glyph: str = "✦"
+    archetype_glyph: str = ""  # SVG markup rendered inside the avatar squircle
     badges: list[Insight] = Field(default_factory=list)
     did_you_know: list[Insight] = Field(default_factory=list)
 
@@ -49,14 +49,47 @@ _ARCHETYPE_TAGLINE = {
     Archetype.VIBE_CODER: "Trusts the flow — fast, instinctive, light-touch.",
 }
 
-# Bold unicode glyphs (not emoji) — crisp at any size, consistent across OSes.
+# Concrete line-icon SVGs (Lucide-style). Stroked in white over the
+# gradient background — instantly recognisable, crisp at any size,
+# no OS-specific emoji rendering.
 _ARCHETYPE_GLYPH = {
-    Archetype.ARCHITECT: "◈",   # diamond = blueprint / structure
-    Archetype.PILOT: "➤",       # arrow = direction
-    Archetype.TINKERER: "⚙",   # gear = tinkering
-    Archetype.VIBE_CODER: "♪",  # note = flow / vibe
+    Archetype.ARCHITECT: (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<rect x="3" y="4" width="18" height="14" rx="1"/>'
+        '<path d="M3 9h18"/><path d="M9 9v9"/><path d="M9 13h6"/>'
+        '</svg>'
+    ),  # blueprint grid
+    Archetype.PILOT: (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<path d="M22 2L11 13"/>'
+        '<path d="M22 2l-7 20-4-9-9-4 20-7z"/>'
+        '</svg>'
+    ),  # paper plane
+    Archetype.TINKERER: (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<path d="M14.7 6.3a4 4 0 1 1 5 5l-9.5 9.5a2.83 2.83 0 1 1-4-4l9.5-9.5z"/>'
+        '</svg>'
+    ),  # wrench
+    Archetype.VIBE_CODER: (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<path d="M4 18v-5a8 8 0 0 1 16 0v5"/>'
+        '<path d="M4 18v1a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H4z" fill="currentColor"/>'
+        '<path d="M20 18v1a2 2 0 0 1-2 2h-1a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3z" fill="currentColor"/>'
+        '</svg>'
+    ),  # headphones
 }
-_NEWCOMER_GLYPH = "✦"
+_NEWCOMER_GLYPH = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>'
+    '<path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>'
+    '<circle cx="12" cy="12" r="3.5"/>'
+    '</svg>'
+)  # sun / sparkle for new users
 
 _DAY_NAMES = (
     "Monday", "Tuesday", "Wednesday", "Thursday",
@@ -263,6 +296,11 @@ def _did_you_know(
     peak_day_date: date | None = None,
     weekend_session_pct: float = 0.0,
     top_first_words: list[tuple[str, int]] | None = None,
+    peak_cell_weekday: int | None = None,
+    peak_cell_hour: int | None = None,
+    peak_cell_count: int = 0,
+    off_peak_session_pct: float = 0.0,
+    model_tier_counts: dict[str, int] | None = None,
 ) -> list[Insight]:
     """Vivid prompt-mined facts. Each item is gated on its data being meaningful.
 
@@ -393,6 +431,55 @@ def _did_you_know(
             rank=50,
         ))
 
+    # 11) Peak hour-of-week (specific weekday × hour cell)
+    if (
+        peak_cell_weekday is not None
+        and peak_cell_hour is not None
+        and peak_cell_count >= 3
+    ):
+        hour_label = _fmt_hour_minute((peak_cell_hour, 0))
+        insights.append(Insight(
+            kind="did_you_know", icon="⏰", title="Hot hour",
+            detail=(
+                f"{_DAY_NAMES[peak_cell_weekday]}s at {hour_label} is your hottest "
+                f"window — {peak_cell_count} sessions started in that hour."
+            ),
+            rank=78,
+        ))
+
+    # 12) Off-peak orchestrator (work outside Mon–Fri 9–6)
+    if off_peak_session_pct >= 0.25:
+        pct = round(100 * off_peak_session_pct)
+        insights.append(Insight(
+            kind="did_you_know", icon="🌒", title="Off-peak operator",
+            detail=(
+                f"{pct}% of your sessions start outside the typical 9–6 weekday "
+                f"window — you keep the AI running on your schedule."
+            ),
+            rank=72,
+        ))
+
+    # 13) Favourite model tier (Premium/Standard/Fast)
+    if model_tier_counts:
+        top_tier, top_turns = max(model_tier_counts.items(), key=lambda kv: kv[1])
+        total = sum(model_tier_counts.values())
+        if total > 0:
+            pct = round(100 * top_turns / total)
+            tier_blurb = {
+                "Premium": "the heaviest reasoning models (Opus, GPT-5.5)",
+                "Standard": "mid-tier daily-driver models (Sonnet, GPT-5)",
+                "Fast": "small/fast models (Haiku, mini variants)",
+                "Other": "models outside the usual tiers",
+            }.get(top_tier, "models in this tier")
+            insights.append(Insight(
+                kind="did_you_know", icon="🎚", title="Model preference",
+                detail=(
+                    f"{pct}% of your AI turns ran on {tier_blurb}. "
+                    f"You tend to reach for the **{top_tier}** tier."
+                ),
+                rank=62,
+            ))
+
     insights.sort(key=lambda i: -i.rank)
     return insights
 
@@ -416,6 +503,11 @@ def compute_personality(
     peak_day_date: date | None = None,
     weekend_session_pct: float = 0.0,
     top_first_words: list[tuple[str, int]] | None = None,
+    peak_cell_weekday: int | None = None,
+    peak_cell_hour: int | None = None,
+    peak_cell_count: int = 0,
+    off_peak_session_pct: float = 0.0,
+    model_tier_counts: dict[str, int] | None = None,
 ) -> AIPersonality:
     """Compute the human-friendly personality bundle for the portal hero."""
     arch_key, arch_glyph = _archetype_key_and_glyph(profile)
@@ -442,5 +534,10 @@ def compute_personality(
             peak_day_date=peak_day_date,
             weekend_session_pct=weekend_session_pct,
             top_first_words=top_first_words,
+            peak_cell_weekday=peak_cell_weekday,
+            peak_cell_hour=peak_cell_hour,
+            peak_cell_count=peak_cell_count,
+            off_peak_session_pct=off_peak_session_pct,
+            model_tier_counts=model_tier_counts,
         ),
     )

@@ -184,6 +184,31 @@
           <span>More</span>
         </div>
       </div>
+      <div class="card chart-wide">
+        <h3>Weekly rhythm <span class="unit">(weekday × hour)</span></h3>
+        <p class="card-sub">When in the week you fire up an AI session. Each cell is one weekday-hour; darker = more sessions started. Reveals your typical work block.</p>
+        <div class="weekhour-wrap">
+          <div class="weekhour-hours" aria-hidden="true">
+            <span>0</span><span></span><span></span><span>3</span><span></span><span></span>
+            <span>6</span><span></span><span></span><span>9</span><span></span><span></span>
+            <span>12</span><span></span><span></span><span>15</span><span></span><span></span>
+            <span>18</span><span></span><span></span><span>21</span><span></span><span></span>
+          </div>
+          <div class="weekhour-grid-wrap">
+            <div class="weekhour-days" aria-hidden="true">
+              <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            </div>
+            <div id="weekhour-heatmap" class="weekhour-heatmap" role="img" aria-label="Weekday by hour heatmap"></div>
+          </div>
+        </div>
+        <div id="weekhour-peak" class="weekhour-peak muted"></div>
+      </div>
+      <div class="card">
+        <h3>Model tier mix <span class="unit">(% of turns)</span></h3>
+        <p class="card-sub">How your AI turns split across Premium (Opus, GPT-5.5), Standard (Sonnet, GPT-5), and Fast (Haiku, mini) tiers. Tells you what you're actually spending compute on.</p>
+        <canvas id="chart-model-tier"></canvas>
+        <ul id="model-tier-legend" class="tier-legend"></ul>
+      </div>
       <div class="card">
         <h3>Time of day <span class="unit">(sessions / hour, local)</span></h3>
         <p class="card-sub">When in the day you start sessions. Tall morning bars = early bird; tall evening bars = night owl.</p>
