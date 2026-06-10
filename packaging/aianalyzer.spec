@@ -33,12 +33,25 @@ datas += collect_data_files(
     "aianalyzer.web",
     includes=["static/**/*"],
 )
+# tiktoken (Phase F): the BPE merge tables live as package data. Without
+# this PyInstaller bundles the .py but loads fail at runtime because the
+# tiktoken_ext registry can't find the .tiktoken merge files.
+datas += collect_data_files("tiktoken")
+datas += collect_data_files("tiktoken_ext")
+# Pre-warmed BPE cache so the .exe never tries to download cl100k_base
+# from openaipublic on first run (kills offline use + corporate proxy issues).
+datas += [(str(ROOT / "packaging" / "tiktoken_cache" / "9b5ad71b2ce5302211f9c61530b329a4922fc6a4"),
+           "tiktoken_cache")]
 
 # Hidden imports. uvicorn lazy-loads protocol/lifespan plugins; FastAPI does
 # the same for some response classes. Static analysis misses them.
 hiddenimports = []
 hiddenimports += collect_submodules("uvicorn")
 hiddenimports += collect_submodules("fastapi")
+# tiktoken loads its encoders via a runtime plugin registry; PyInstaller's
+# static analyzer can't see the dotted-string imports. Without this the
+# .exe raises "Unknown encoding cl100k_base" the first time anyone scans.
+hiddenimports += collect_submodules("tiktoken_ext")
 hiddenimports += [
     # uvicorn[standard] extras that are imported by string name at runtime.
     "uvicorn.logging",
@@ -59,7 +72,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(ROOT / "packaging" / "rthook_tiktoken.py")],
     excludes=[
         # Trim weight: test frameworks should never end up in the shipped .exe.
         "pytest",
