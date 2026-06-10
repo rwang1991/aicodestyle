@@ -13,7 +13,8 @@ from aianalyzer.features import SessionFeatures
 #     (gaps > 5 minutes are treated as idle).
 # v8: prompt-mined facts (Phase C) — longest_prompt_words, total_user_words,
 #     first/last_user_msg_at, first_words.
-SCHEMA_VERSION = 8
+# v9: first_words preserves apostrophes ("let's" instead of "lets").
+SCHEMA_VERSION = 9
 
 
 class FeatureStore:

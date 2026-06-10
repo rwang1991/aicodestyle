@@ -72,8 +72,18 @@ def test_empty_session_has_zeroed_prompt_facts():
 def test_first_words_strips_punctuation_and_lowercases():
     msgs = [
         ("Fix the bug", _dt(9)),
-        ("/refactor please", _dt(10)),   # leading slash should be stripped
+        ("/refactor please", _dt(10)),
         ("CREATE a new module", _dt(11)),
     ]
     sf = extract_session_features(_session_with_user_msgs(msgs))
     assert sf.first_words == ["fix", "refactor", "create"]
+
+
+def test_first_words_preserves_internal_apostrophe():
+    msgs = [
+        ("Let's add a test", _dt(9)),
+        ("Don't break the API", _dt(10)),
+        ("It's working", _dt(11)),
+    ]
+    sf = extract_session_features(_session_with_user_msgs(msgs))
+    assert sf.first_words == ["let's", "don't", "it's"]

@@ -195,13 +195,17 @@ def _engaged_session_seconds(turns: list, idle_cap: float = _IDLE_CAP_SEC) -> fl
 def _first_token(msg: str) -> str:
     """Return the first alphanumeric token in `msg`, lowercased.
 
-    Strips leading punctuation (e.g. "/refactor" → "refactor") and ignores
-    purely punctuation/whitespace tokens. Returns "" if the message has no
-    alphanumeric characters.
+    Keeps an internal apostrophe (so ``Let's`` -> ``let's``, ``don't`` ->
+    ``don't``) but strips leading/trailing punctuation (``/refactor`` ->
+    ``refactor``). Returns "" if the message has no alphanumeric characters.
     """
     for tok in msg.lower().split():
-        cleaned = "".join(ch for ch in tok if ch.isalnum())
-        if cleaned:
+        # Strip leading/trailing punctuation but keep internal apostrophes.
+        cleaned = tok.strip(".,!?;:()[]{}\"`/\\<>*#-_=+|~")
+        # Drop anything that's still not alphanumeric or apostrophe.
+        cleaned = "".join(ch for ch in cleaned if ch.isalnum() or ch == "'")
+        # Make sure the result has at least one alphanumeric character.
+        if any(ch.isalnum() for ch in cleaned):
             return cleaned
     return ""
 
