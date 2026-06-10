@@ -110,6 +110,13 @@ class SessionFeatures(BaseModel):
     file_reference_rate: float = 0.0
     ai_agency_rate: float = 0.0
 
+    # Prompt-mined facts (Phase C vivid report)
+    longest_prompt_words: int = 0
+    total_user_words: int = 0
+    first_user_msg_at: datetime | None = None
+    last_user_msg_at: datetime | None = None
+    first_words: list[str] = Field(default_factory=list)
+
 
 def _user_messages(turns: Iterable[Turn]) -> list[str]:
     return [t.user.content for t in turns if t.user is not None]
@@ -185,6 +192,20 @@ def _engaged_session_seconds(turns: list, idle_cap: float = _IDLE_CAP_SEC) -> fl
     return engaged
 
 
+def _first_token(msg: str) -> str:
+    """Return the first alphanumeric token in `msg`, lowercased.
+
+    Strips leading punctuation (e.g. "/refactor" → "refactor") and ignores
+    purely punctuation/whitespace tokens. Returns "" if the message has no
+    alphanumeric characters.
+    """
+    for tok in msg.lower().split():
+        cleaned = "".join(ch for ch in tok if ch.isalnum())
+        if cleaned:
+            return cleaned
+    return ""
+
+
 def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     turns = session.turns
     user_msgs = _user_messages(turns)
@@ -204,6 +225,17 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     prompt_specificity = _avg([_specificity_score(m) for m in user_msgs])
     code_block_density = _avg([1.0 if _has_code_content(m) else 0.0 for m in user_msgs])
     file_reference_rate = _avg([1.0 if _has_file_reference(m) else 0.0 for m in user_msgs])
+
+    # Prompt-mined facts (Phase C vivid report). Per-session aggregates that
+    # `stats.py` rolls up into vivid did-you-know callouts ("your longest
+    # prompt", "your latest hour", etc.).
+    word_counts = [len(m.split()) for m in user_msgs]
+    longest_prompt_words = max(word_counts) if word_counts else 0
+    total_user_words = sum(word_counts)
+    user_turn_times = [t.user.ts for t in turns if t.user is not None]
+    first_user_msg_at = min(user_turn_times) if user_turn_times else None
+    last_user_msg_at = max(user_turn_times) if user_turn_times else None
+    first_words = [w for w in (_first_token(m) for m in user_msgs) if w]
     # S9: thinks_before_prompt_sec_avg.
     # Cap each (assistant -> next user) gap at ``_IDLE_CAP_SEC`` so an overnight
     # session left open (12h+ between turns) doesn't drag the average into the
@@ -419,6 +451,11 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         code_block_density=code_block_density,
         file_reference_rate=file_reference_rate,
         ai_agency_rate=ai_agency_rate,
+        longest_prompt_words=longest_prompt_words,
+        total_user_words=total_user_words,
+        first_user_msg_at=first_user_msg_at,
+        last_user_msg_at=last_user_msg_at,
+        first_words=first_words,
     )
 
 

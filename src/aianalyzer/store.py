@@ -11,7 +11,9 @@ from aianalyzer.features import SessionFeatures
 # Bump whenever SessionFeatures shape OR meaningful semantics change.
 # v5: session_duration_sec switched from wall-clock to engaged-time
 #     (gaps > 5 minutes are treated as idle).
-SCHEMA_VERSION = 7
+# v8: prompt-mined facts (Phase C) — longest_prompt_words, total_user_words,
+#     first/last_user_msg_at, first_words.
+SCHEMA_VERSION = 8
 
 
 class FeatureStore:
