@@ -81,6 +81,55 @@
     if (charts[id]) { charts[id].destroy(); delete charts[id]; }
   }
 
+  // GitHub-style 7-row calendar heatmap. Renders a 7×N grid of cells where
+  // each cell is one day; intensity is bucketed 0..4 relative to the max.
+  function renderActivityHeatmap(activity) {
+    const root = document.getElementById("activity-heatmap");
+    if (!root) return;
+    root.innerHTML = "";
+    if (!activity || activity.length === 0) return;
+
+    // activity is [[dateStr, count], ...] ordered oldest -> newest.
+    const cells = activity.map(([dateStr, count]) => {
+      const d = new Date(dateStr + "T00:00:00");
+      // Monday=0..Sunday=6 so the grid starts with Monday on row 0.
+      const weekday = (d.getDay() + 6) % 7;
+      return { date: dateStr, count, weekday };
+    });
+
+    // Insert leading blanks so column 0 begins on Monday.
+    const lead = cells[0] ? cells[0].weekday : 0;
+    const filled = [...Array(lead).fill(null), ...cells];
+
+    // Pad trailing blanks so the grid ends on a full column.
+    while (filled.length % 7 !== 0) filled.push(null);
+
+    const max = Math.max(...cells.map((c) => c.count), 0);
+    const bucket = (n) => {
+      if (!n || n <= 0) return 0;
+      if (max <= 1) return 4;
+      return Math.min(4, Math.max(1, Math.ceil((n / max) * 4)));
+    };
+
+    const cols = filled.length / 7;
+    root.style.setProperty("--cols", cols);
+
+    for (let col = 0; col < cols; col++) {
+      for (let row = 0; row < 7; row++) {
+        const c = filled[col * 7 + row];
+        const cell = document.createElement("div");
+        cell.className = "heatmap-cell";
+        if (!c) {
+          cell.classList.add("blank");
+        } else {
+          cell.dataset.level = String(bucket(c.count));
+          cell.title = `${c.date}: ${c.count} session${c.count === 1 ? "" : "s"}`;
+        }
+        root.appendChild(cell);
+      }
+    }
+  }
+
   // Comments on signal coverage per client. Surfaces tool-coverage caveats
   // when VS Code data dominates so users know why some axes may look low.
   const CLIENT_COVERAGE_NOTES = {
@@ -457,7 +506,6 @@
   function renderCharts(p) {
     destroyChart("chart-session-types");
     destroyChart("chart-top-tools");
-    destroyChart("chart-activity");
     destroyChart("chart-hour");
     destroyChart("chart-weekday");
 
@@ -495,29 +543,7 @@
     }
 
     const activity = p.activity_per_day_last_90 || [];
-    if (activity.length > 0) {
-      const labels = activity.map(([date]) => date);
-      const data = activity.map(([, count]) => count);
-      charts["chart-activity"] = new Chart($("#chart-activity"), {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
-            data,
-            borderColor: PALETTE[0],
-            backgroundColor: PALETTE[0] + "33",
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { x: { display: false } }
-        }
-      });
-    }
+    renderActivityHeatmap(activity);
 
     const hourHist = p.hour_histogram || [];
     if (hourHist.length === 24) {

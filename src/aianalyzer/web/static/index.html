@@ -163,9 +163,23 @@
         <canvas id="chart-top-tools"></canvas>
       </div>
       <div class="card chart-wide">
-        <h3>Activity <span class="unit">(sessions / day, last 90 days)</span></h3>
-        <p class="card-sub">Daily session count over the past 90 days. Gaps indicate quiet days.</p>
-        <canvas id="chart-activity"></canvas>
+        <h3>Activity <span class="unit">(last 90 days)</span></h3>
+        <p class="card-sub">GitHub-style heatmap: each square is one day; darker green = more sessions. Hover for the exact count.</p>
+        <div class="activity-heatmap-wrap">
+          <div class="activity-weekday-labels" aria-hidden="true">
+            <span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span>
+          </div>
+          <div id="activity-heatmap" class="activity-heatmap" role="img" aria-label="Activity heatmap of the last 90 days"></div>
+        </div>
+        <div class="activity-legend">
+          <span>Less</span>
+          <span class="legend-cell" data-level="0"></span>
+          <span class="legend-cell" data-level="1"></span>
+          <span class="legend-cell" data-level="2"></span>
+          <span class="legend-cell" data-level="3"></span>
+          <span class="legend-cell" data-level="4"></span>
+          <span>More</span>
+        </div>
       </div>
       <div class="card">
         <h3>Time of day <span class="unit">(sessions / hour, local)</span></h3>
