@@ -286,5 +286,10 @@ def load_profile_payload() -> dict[str, Any]:
         "first_session_at": ext.first_session_at.isoformat() if ext.first_session_at else None,
         "last_session_at": ext.last_session_at.isoformat() if ext.last_session_at else None,
         "behavior": _build_behavior_block(user_profile),
-        "personality": compute_personality(user_profile, features).model_dump(),
+        "personality": compute_personality(
+            user_profile,
+            features,
+            longest_streak_days=ext.longest_streak_days,
+            top_tools=ext.top_tools,
+        ).model_dump(),
     }

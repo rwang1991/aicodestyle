@@ -28,6 +28,7 @@ class AIPersonality(BaseModel):
     model_config = ConfigDict(frozen=True)
     nickname: str
     tagline: str
+    archetype_emoji: str = ""
     badges: list[Insight] = Field(default_factory=list)
     did_you_know: list[Insight] = Field(default_factory=list)
 
@@ -38,6 +39,14 @@ _ARCHETYPE_WORD = {
     Archetype.TINKERER: "Tinkerer",
     Archetype.VIBE_CODER: "Vibe Coder",
 }
+
+_ARCHETYPE_EMOJI = {
+    Archetype.ARCHITECT: "🏛️",
+    Archetype.PILOT: "🎯",
+    Archetype.TINKERER: "🛠️",
+    Archetype.VIBE_CODER: "✨",
+}
+_NEWCOMER_EMOJI = "🌱"
 
 _ARCHETYPE_TAGLINE = {
     Archetype.ARCHITECT: "Plans the work, then drives the tools.",
@@ -106,7 +115,19 @@ def _tagline(profile: UserProfile) -> str:
     return _ARCHETYPE_TAGLINE.get(result.primary, "Your AI coding style.")
 
 
-def _badges(profile: UserProfile, features: list[SessionFeatures]) -> list[Insight]:
+def _archetype_emoji(profile: UserProfile) -> str:
+    if profile.session_count == 0:
+        return _NEWCOMER_EMOJI
+    result = classify(profile)
+    return _ARCHETYPE_EMOJI.get(result.primary, _NEWCOMER_EMOJI)
+
+
+def _badges(
+    profile: UserProfile,
+    features: list[SessionFeatures],
+    *,
+    longest_streak_days: int = 0,
+) -> list[Insight]:
     badges: list[Insight] = []
     if not features:
         return badges
@@ -187,12 +208,22 @@ def _badges(profile: UserProfile, features: list[SessionFeatures]) -> list[Insig
             rank=58,
         ))
 
+    if longest_streak_days >= 7:
+        badges.append(Insight(
+            kind="achievement", icon="📈", title="On a Roll",
+            detail=f"You coded with AI for {longest_streak_days} days in a row.",
+            rank=92,
+        ))
+
     badges.sort(key=lambda b: -b.rank)
     return badges
 
 
 def _did_you_know(
-    profile: UserProfile, features: list[SessionFeatures]
+    profile: UserProfile,
+    features: list[SessionFeatures],
+    *,
+    top_tools: list[tuple[str, int]] | None = None,
 ) -> list[Insight]:
     insights: list[Insight] = []
     if not features:
@@ -247,6 +278,14 @@ def _did_you_know(
             rank=55,
         ))
 
+    if top_tools:
+        name, count = top_tools[0]
+        insights.append(Insight(
+            kind="did_you_know", icon="🔧", title="Favourite tool",
+            detail=f"You reach for `{name}` more than any other tool — {count:,} uses.",
+            rank=75,
+        ))
+
     insights.sort(key=lambda i: -i.rank)
     return insights
 
@@ -254,11 +293,15 @@ def _did_you_know(
 def compute_personality(
     profile: UserProfile,
     features: list[SessionFeatures],
+    *,
+    longest_streak_days: int = 0,
+    top_tools: list[tuple[str, int]] | None = None,
 ) -> AIPersonality:
     """Compute the human-friendly personality bundle for the portal hero."""
     return AIPersonality(
         nickname=_nickname(profile, features),
         tagline=_tagline(profile),
-        badges=_badges(profile, features),
-        did_you_know=_did_you_know(profile, features),
+        archetype_emoji=_archetype_emoji(profile),
+        badges=_badges(profile, features, longest_streak_days=longest_streak_days),
+        did_you_know=_did_you_know(profile, features, top_tools=top_tools),
     )

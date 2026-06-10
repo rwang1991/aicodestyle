@@ -113,3 +113,58 @@ def test_handles_empty_session_list():
     assert p.tagline
     assert p.badges == []
     assert p.did_you_know == []
+
+
+def test_archetype_emoji_is_set_for_known_archetypes():
+    # An archetype that resolves cleanly should yield a non-empty emoji.
+    p = compute_personality(
+        _profile(
+            planning_language_ratio=0.8,
+            prompt_specificity_avg=0.7,
+            file_reference_rate=0.6,
+            accept_and_go_ratio=0.05,
+        ),
+        [_feat()],
+    )
+    assert p.archetype_emoji
+    assert len(p.archetype_emoji) > 0
+
+
+def test_archetype_emoji_defaults_for_empty_profile():
+    # Newcomer still gets *some* emoji so the UI never renders a void.
+    p = compute_personality(UserProfile(), [])
+    assert p.archetype_emoji
+
+
+def test_streak_badge_appears_when_longest_streak_meets_threshold():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        longest_streak_days=14,
+    )
+    assert any(b.title == "On a Roll" for b in p.badges)
+    streak = next(b for b in p.badges if b.title == "On a Roll")
+    assert "14" in streak.detail
+
+
+def test_streak_badge_absent_when_streak_too_short():
+    p = compute_personality(_profile(), [_feat()], longest_streak_days=2)
+    assert not any(b.title == "On a Roll" for b in p.badges)
+
+
+def test_favorite_tool_insight_appears_when_top_tools_provided():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        top_tools=[("edit", 9824), ("readFile", 4000), ("search", 1200)],
+    )
+    titles = [d.title for d in p.did_you_know]
+    assert "Favourite tool" in titles
+    fav = next(d for d in p.did_you_know if d.title == "Favourite tool")
+    assert "edit" in fav.detail
+    assert "9824" in fav.detail or "9,824" in fav.detail
+
+
+def test_favorite_tool_insight_absent_when_no_tools():
+    p = compute_personality(_profile(), [_feat()], top_tools=[])
+    assert not any(d.title == "Favourite tool" for d in p.did_you_know)
