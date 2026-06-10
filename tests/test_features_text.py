@@ -51,5 +51,8 @@ def test_all_signal_fields_defined():
         # Portal-extended fields (M4)
         "cwd", "avg_user_msg_words", "tool_counts", "file_paths_touched",
         "started_hour_local", "started_weekday", "models_used", "session_type",
+        # Hands-on signals (Phase A axis rework)
+        "prompt_specificity_avg", "code_block_density",
+        "file_reference_rate", "ai_agency_rate",
     }
     assert set(SessionFeatures.model_fields.keys()) == expected_fields

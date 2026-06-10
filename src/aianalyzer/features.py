@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter
 from datetime import datetime
 from statistics import mean
@@ -26,6 +27,39 @@ _ACCEPT_TOKENS = {
     "do it", "ship it", "sounds good", "looks good", "lgtm",
 }
 _EDIT_TOOL_NAMES = {"edit", "create", "write"}
+
+# Hands-on signal helpers (Phase A axis rework)
+_CODE_FENCE_RE = re.compile(r"```")
+_CODE_LINE_RE = re.compile(
+    r"^\s*(?:def |class |import |from |return |if |for |while |[\{\}]|//|/\*|<\?|\$\(|>>>|\.\.\. )",
+    re.MULTILINE,
+)
+# File path with extension OR explicit @file mention OR `name()` function call.
+# Order matters: more specific patterns first so they "win" via overall regex match.
+_FILE_REF_RE = re.compile(
+    r"(?:[\w\-./\\]+\.(?:py|ts|tsx|js|jsx|go|rs|java|kt|cpp|c|h|hpp|cs|rb|php|swift|md|json|yaml|yml|toml|sh|ps1|html|css|sql|proto))(?::\d+)?"
+    r"|@[\w\-./]+"
+    r"|\b[a-z_][a-z0-9_]*\([^)]*\)",
+    re.IGNORECASE,
+)
+_SPECIFICITY_MAX_WORDS = 200  # cap so a 5000-word essay doesn't dominate
+
+
+def _has_code_content(msg: str) -> bool:
+    """True if the message has a fenced code block OR >=3 code-looking lines."""
+    if _CODE_FENCE_RE.search(msg):
+        return True
+    return len(_CODE_LINE_RE.findall(msg)) >= 3
+
+
+def _has_file_reference(msg: str) -> bool:
+    return bool(_FILE_REF_RE.search(msg))
+
+
+def _specificity_score(msg: str) -> float:
+    """Word count, capped at _SPECIFICITY_MAX_WORDS, normalised to [0, 1]."""
+    words = len(msg.split())
+    return min(words, _SPECIFICITY_MAX_WORDS) / _SPECIFICITY_MAX_WORDS
 
 
 class SessionFeatures(BaseModel):
@@ -69,6 +103,12 @@ class SessionFeatures(BaseModel):
     started_weekday: int = 0
     models_used: dict[str, int] = Field(default_factory=dict)
     session_type: SessionType = SessionType.MIXED
+
+    # Hands-on signals (Phase A axis rework) - capture USER agency
+    prompt_specificity_avg: float = 0.0
+    code_block_density: float = 0.0
+    file_reference_rate: float = 0.0
+    ai_agency_rate: float = 0.0
 
 
 def _user_messages(turns: Iterable[Turn]) -> list[str]:
@@ -159,6 +199,11 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     ])
     # S17
     test_mention = _avg([1.0 if _contains_any(m, _TEST_TOKENS) else 0.0 for m in user_msgs])
+
+    # Hands-on signals (Phase A axis rework) - all derived from user-typed text
+    prompt_specificity = _avg([_specificity_score(m) for m in user_msgs])
+    code_block_density = _avg([1.0 if _has_code_content(m) else 0.0 for m in user_msgs])
+    file_reference_rate = _avg([1.0 if _has_file_reference(m) else 0.0 for m in user_msgs])
     # S9: thinks_before_prompt_sec_avg.
     # Cap each (assistant -> next user) gap at ``_IDLE_CAP_SEC`` so an overnight
     # session left open (12h+ between turns) doesn't drag the average into the
@@ -176,6 +221,12 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     all_tool_calls = [c for t in turns for c in t.tool_calls]
     tool_name_counts = Counter(c.tool_name for c in all_tool_calls)
     tool_diversity = _shannon_entropy(list(tool_name_counts.values()))
+
+    # ai_agency_rate: how many tool calls the AI made per user prompt.
+    # High = AI is doing the work autonomously (user is hands-off).
+    ai_agency_rate = (
+        len(all_tool_calls) / len(user_msgs) if user_msgs else 0.0
+    )
 
     accept_and_go = _avg([1.0 if (t.user and _is_accept_and_go(t.user.content)) else 0.0 for t in turns])
     revision_depth = (len(all_tool_calls) / len(turns)) if turns else 0.0
@@ -364,6 +415,10 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         started_weekday=started_weekday,
         models_used=models_used_dict,
         session_type=session_type,
+        prompt_specificity_avg=prompt_specificity,
+        code_block_density=code_block_density,
+        file_reference_rate=file_reference_rate,
+        ai_agency_rate=ai_agency_rate,
     )
 
 
@@ -391,6 +446,12 @@ class UserProfile(BaseModel):
     abort_rate: float = 0.0
     reasoning_effort_distribution: dict[str, float] = Field(default_factory=dict)
 
+    # Hands-on signals (Phase A axis rework)
+    prompt_specificity_avg: float = 0.0
+    code_block_density: float = 0.0
+    file_reference_rate: float = 0.0
+    ai_agency_rate: float = 0.0
+
 
 _WEIGHTED_SCALARS = (
     "avg_user_msg_chars",
@@ -406,6 +467,10 @@ _WEIGHTED_SCALARS = (
     "edited_files_per_turn_avg",
     "parallel_tool_call_rate",
     "abort_rate",
+    "prompt_specificity_avg",
+    "code_block_density",
+    "file_reference_rate",
+    "ai_agency_rate",
 )
 
 
