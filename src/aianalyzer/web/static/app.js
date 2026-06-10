@@ -207,6 +207,51 @@
     }
 
     renderQuadrantMap(p);
+    renderPersonality(p.personality);
+  }
+
+  function renderPersonality(personality) {
+    const card = document.getElementById("personality-card");
+    if (!card) return;
+    if (!personality || (!personality.nickname && !(personality.badges || []).length && !(personality.did_you_know || []).length)) {
+      card.classList.add("hidden");
+      return;
+    }
+    card.classList.remove("hidden");
+    card.querySelector(".personality-nickname").textContent = personality.nickname || "";
+    card.querySelector(".personality-tagline").textContent = personality.tagline || "";
+
+    const badgesEl = card.querySelector(".personality-badges");
+    badgesEl.innerHTML = "";
+    for (const b of personality.badges || []) {
+      const chip = document.createElement("span");
+      chip.className = "badge";
+      chip.title = b.detail || "";
+      const icon = document.createElement("span");
+      icon.className = "badge-icon"; icon.textContent = b.icon || "";
+      const title = document.createElement("span");
+      title.className = "badge-title"; title.textContent = b.title || "";
+      chip.appendChild(icon); chip.appendChild(title);
+      badgesEl.appendChild(chip);
+    }
+
+    const insightsWrap = card.querySelector(".personality-insights");
+    const dykList = card.querySelector(".did-you-know-list");
+    dykList.innerHTML = "";
+    const items = personality.did_you_know || [];
+    insightsWrap.style.display = items.length ? "" : "none";
+    for (const i of items) {
+      const li = document.createElement("li");
+      const icon = document.createElement("span");
+      icon.className = "dyk-icon"; icon.textContent = i.icon || "";
+      const text = document.createElement("span");
+      const strong = document.createElement("b");
+      strong.textContent = i.title ? `${i.title}.` : "";
+      text.appendChild(strong);
+      text.appendChild(document.createTextNode(" " + (i.detail || "")));
+      li.appendChild(icon); li.appendChild(text);
+      dykList.appendChild(li);
+    }
   }
 
   function renderQuadrantMap(p) {
