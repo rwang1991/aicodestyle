@@ -250,6 +250,71 @@
     }
   }
 
+  function _formatTokens(n) {
+    if (!n) return "0";
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+    return String(n);
+  }
+
+  function renderTokenCard(te, sessionCount) {
+    const card = document.getElementById("token-card");
+    if (!card) return;
+    if (!te || !te.est_total_tokens) {
+      card.classList.add("hidden");
+      return;
+    }
+    card.classList.remove("hidden");
+
+    document.getElementById("tok-total").textContent = _formatTokens(te.est_total_tokens);
+    document.getElementById("tok-io").textContent =
+      `${_formatTokens(te.est_input_tokens)} in · ${_formatTokens(te.est_output_tokens)} out`;
+
+    const cost = te.est_cost_usd || 0;
+    document.getElementById("tok-cost").textContent =
+      cost > 0 ? `$${cost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : "—";
+    const pricedPct = Math.round((te.priced_token_share || 0) * 100);
+    document.getElementById("tok-priced").textContent =
+      pricedPct > 0 ? `${pricedPct}% of tokens are on priced models` : "All models are unpriced / proprietary";
+
+    const ratio = te.output_to_input_ratio || 0;
+    document.getElementById("tok-ratio").textContent = ratio > 0 ? ratio.toFixed(2) + "×" : "—";
+    let style = "—";
+    if (ratio >= 3.0) style = "Generator style (AI elaborates)";
+    else if (ratio > 0 && ratio <= 0.7) style = "Reviewer style (you direct)";
+    else if (ratio > 0) style = "Balanced exchange";
+    document.getElementById("tok-style").textContent = style;
+
+    const pareto = te.sessions_for_80pct_tokens || 0;
+    document.getElementById("tok-pareto").textContent = pareto > 0 ? `${pareto}` : "—";
+    if (pareto > 0 && sessionCount > 0) {
+      const pct = Math.round(100 * pareto / sessionCount);
+      document.getElementById("tok-pareto-sub").textContent =
+        `${pct}% of your sessions drive 80% of spend`;
+    } else {
+      document.getElementById("tok-pareto-sub").textContent = "—";
+    }
+
+    const tbody = document.getElementById("token-top-tbody");
+    tbody.innerHTML = "";
+    for (const s of (te.top_cost_sessions || [])) {
+      const tr = document.createElement("tr");
+      const started = new Date(s.started_at);
+      const dateLabel = started.toLocaleString(undefined, {
+        year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+      });
+      const costStr = s.est_cost_usd != null
+        ? `$${s.est_cost_usd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+        : "—";
+      tr.innerHTML =
+        `<td>${dateLabel}</td>` +
+        `<td>${s.session_type || ""}</td>` +
+        `<td>${_formatTokens(s.est_total_tokens)}</td>` +
+        `<td>${costStr}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
   function renderDataSources(p) {
     const section = document.getElementById("data-sources");
     if (!section) return;
@@ -666,6 +731,7 @@
 
     renderWeekHourHeatmap(p.weekday_hour_matrix, p.peak_cell);
     renderModelTier(p.model_tier_counts);
+    renderTokenCard(p.token_economy, p.total_sessions || 0);
 
     const hourHist = p.hour_histogram || [];
     if (hourHist.length === 24) {

@@ -301,6 +301,11 @@ def _did_you_know(
     peak_cell_count: int = 0,
     off_peak_session_pct: float = 0.0,
     model_tier_counts: dict[str, int] | None = None,
+    est_total_tokens: int = 0,
+    est_cost_usd: float = 0.0,
+    output_to_input_ratio: float = 0.0,
+    sessions_for_80pct_tokens: int = 0,
+    priced_token_share: float = 0.0,
 ) -> list[Insight]:
     """Vivid prompt-mined facts. Each item is gated on its data being meaningful.
 
@@ -480,6 +485,73 @@ def _did_you_know(
                 rank=62,
             ))
 
+    # 14) Token burn — total tokens estimated + USD cost
+    if est_total_tokens >= 100_000:
+        if est_cost_usd > 0:
+            insights.append(Insight(
+                kind="did_you_know", icon="🔥", title="Token burn",
+                detail=(
+                    f"You've burned ~{est_total_tokens/1_000_000:.1f}M tokens across all "
+                    f"sessions — roughly **${est_cost_usd:,.2f}** at current list prices "
+                    "(tiktoken estimate)."
+                ),
+                rank=92,
+            ))
+        else:
+            insights.append(Insight(
+                kind="did_you_know", icon="🔥", title="Token burn",
+                detail=(
+                    f"You've burned ~{est_total_tokens/1_000_000:.1f}M tokens across all "
+                    "sessions (cost not shown — your models use proprietary pricing)."
+                ),
+                rank=92,
+            ))
+
+    # 15) Pareto — how concentrated is the spend?
+    if sessions_for_80pct_tokens > 0 and profile.session_count > 0:
+        pct_sessions = round(100 * sessions_for_80pct_tokens / profile.session_count)
+        if pct_sessions <= 25:
+            insights.append(Insight(
+                kind="did_you_know", icon="📊", title="Concentrated spender",
+                detail=(
+                    f"Just **{sessions_for_80pct_tokens} sessions ({pct_sessions}%)** "
+                    f"account for 80% of your total token usage — a few deep dives "
+                    f"dominate your AI footprint."
+                ),
+                rank=75,
+            ))
+        elif pct_sessions >= 60:
+            insights.append(Insight(
+                kind="did_you_know", icon="📊", title="Even spender",
+                detail=(
+                    f"It takes **{sessions_for_80pct_tokens} sessions ({pct_sessions}%)** "
+                    "to reach 80% of your tokens — your usage is spread evenly across "
+                    "many small interactions."
+                ),
+                rank=72,
+            ))
+
+    # 16) Generator vs Reviewer style — output:input ratio
+    if output_to_input_ratio >= 3.0 and est_total_tokens >= 50_000:
+        insights.append(Insight(
+            kind="did_you_know", icon="📝", title="Generator style",
+            detail=(
+                f"AI writes about **{output_to_input_ratio:.1f}× more text than you do** — "
+                "you ask short questions and let it elaborate. Classic generator pattern."
+            ),
+            rank=68,
+        ))
+    elif output_to_input_ratio <= 0.7 and est_total_tokens >= 50_000:
+        insights.append(Insight(
+            kind="did_you_know", icon="🔍", title="Reviewer style",
+            detail=(
+                f"You type **{(1/output_to_input_ratio if output_to_input_ratio else 0):.1f}× more "
+                "than the AI replies** — you direct in detail and the AI confirms or "
+                "edits. Classic reviewer pattern."
+            ),
+            rank=68,
+        ))
+
     insights.sort(key=lambda i: -i.rank)
     return insights
 
@@ -508,6 +580,11 @@ def compute_personality(
     peak_cell_count: int = 0,
     off_peak_session_pct: float = 0.0,
     model_tier_counts: dict[str, int] | None = None,
+    est_total_tokens: int = 0,
+    est_cost_usd: float = 0.0,
+    output_to_input_ratio: float = 0.0,
+    sessions_for_80pct_tokens: int = 0,
+    priced_token_share: float = 0.0,
 ) -> AIPersonality:
     """Compute the human-friendly personality bundle for the portal hero."""
     arch_key, arch_glyph = _archetype_key_and_glyph(profile)
@@ -539,5 +616,10 @@ def compute_personality(
             peak_cell_count=peak_cell_count,
             off_peak_session_pct=off_peak_session_pct,
             model_tier_counts=model_tier_counts,
+            est_total_tokens=est_total_tokens,
+            est_cost_usd=est_cost_usd,
+            output_to_input_ratio=output_to_input_ratio,
+            sessions_for_80pct_tokens=sessions_for_80pct_tokens,
+            priced_token_share=priced_token_share,
         ),
     )

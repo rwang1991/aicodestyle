@@ -306,3 +306,54 @@ def test_model_tier_helper_handles_edge_cases():
     assert _model_tier("claude-sonnet-4.5") == "Standard"
     assert _model_tier("copilot/gpt-5-codex") == "Standard"
     assert _model_tier("totally-unknown") == "Other"
+
+
+# ---------------------------------------------------------------------------
+# Phase F — token economy aggregates
+# ---------------------------------------------------------------------------
+
+def test_compute_extended_profile_aggregates_token_totals():
+    sessions = [
+        _sf(session_id="s1", est_input_tokens=1000, est_output_tokens=2000,
+            est_total_tokens=3000, est_cost_usd=0.05, priced_token_share=1.0),
+        _sf(session_id="s2", est_input_tokens=500, est_output_tokens=1500,
+            est_total_tokens=2000, est_cost_usd=0.03, priced_token_share=1.0),
+        _sf(session_id="s3", est_input_tokens=200, est_output_tokens=300,
+            est_total_tokens=500, est_cost_usd=None, priced_token_share=0.0),
+    ]
+    p = compute_extended_profile(sessions)
+    assert p.est_input_tokens == 1700
+    assert p.est_output_tokens == 3800
+    assert p.est_total_tokens == 5500
+    assert p.est_cost_usd == pytest.approx(0.08)
+    # output (3800) / input (1700) ≈ 2.235
+    assert p.output_to_input_ratio == pytest.approx(3800 / 1700)
+    # 5000 of 5500 total tokens are priced ≈ 0.909
+    assert p.priced_token_share == pytest.approx(5000 / 5500)
+
+
+def test_pareto_sessions_for_80pct():
+    # 10 sessions where session 1 has 800 tokens, rest 100 each => session 1 alone is 80%.
+    sessions = [_sf(session_id="big", est_input_tokens=400, est_output_tokens=400,
+                    est_total_tokens=800, est_cost_usd=0.01)]
+    for i in range(9):
+        sessions.append(_sf(session_id=f"s{i}", est_input_tokens=50, est_output_tokens=50,
+                            est_total_tokens=100, est_cost_usd=0.001))
+    p = compute_extended_profile(sessions)
+    # total = 1700; 80% = 1360. The 800-session alone is 800, plus next sessions
+    # at 100 each until cumulative >= 1360. 800 + 6*100 = 1400 >= 1360.
+    assert p.sessions_for_80pct_tokens == 7
+
+
+def test_top_cost_sessions_truncated_to_five_and_ordered():
+    sessions = []
+    for i in range(7):
+        sessions.append(_sf(
+            session_id=f"s{i}",
+            est_input_tokens=i*100, est_output_tokens=i*100,
+            est_total_tokens=i*200, est_cost_usd=float(i) * 0.01,
+        ))
+    p = compute_extended_profile(sessions)
+    assert len(p.top_cost_sessions) == 5
+    costs = [s["est_cost_usd"] for s in p.top_cost_sessions]
+    assert costs == sorted(costs, reverse=True)

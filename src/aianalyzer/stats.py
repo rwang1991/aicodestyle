@@ -74,6 +74,21 @@ class ExtendedProfile:
     # cost vs power.
     model_tier_counts: dict[str, int] = field(default_factory=dict)
 
+    # Token economy (Phase F). All token counts are tiktoken estimates;
+    # costs are derived from pricing.py and may be partial when some sessions
+    # used unpriced/internal models. `priced_token_share` is the global
+    # token-weighted share of activity for which we have published rates.
+    est_total_tokens: int = 0
+    est_input_tokens: int = 0
+    est_output_tokens: int = 0
+    est_cost_usd: float = 0.0
+    priced_token_share: float = 0.0
+    output_to_input_ratio: float = 0.0
+    # Pareto: smallest number of sessions that account for >=80% of total
+    # token spend. A small number = "a few big sessions dominate".
+    sessions_for_80pct_tokens: int = 0
+    top_cost_sessions: list[dict] = field(default_factory=list)
+
 
 def _percentile(values: list[float], q: float) -> float:
     if not values:
@@ -290,5 +305,48 @@ def compute_extended_profile(features: Iterable[SessionFeatures]) -> ExtendedPro
     for model, count in model_totals.items():
         tier_counts[_model_tier(model)] += count
     p.model_tier_counts = dict(tier_counts)
+
+    # Phase F: token economy aggregates.
+    p.est_input_tokens = sum(f.est_input_tokens for f in fs)
+    p.est_output_tokens = sum(f.est_output_tokens for f in fs)
+    p.est_total_tokens = p.est_input_tokens + p.est_output_tokens
+    p.est_cost_usd = sum(f.est_cost_usd for f in fs if f.est_cost_usd is not None)
+    p.output_to_input_ratio = (
+        p.est_output_tokens / p.est_input_tokens if p.est_input_tokens > 0 else 0.0
+    )
+    # priced_token_share at the profile level is token-weighted, not
+    # session-weighted, so a single huge unpriced session correctly drags it
+    # down (rather than just counting one session).
+    priced_tokens_total = sum(
+        f.est_total_tokens for f in fs if f.est_cost_usd is not None
+    )
+    p.priced_token_share = (
+        priced_tokens_total / p.est_total_tokens if p.est_total_tokens > 0 else 0.0
+    )
+
+    # Pareto on token spend: how many sessions hit 80% of total tokens?
+    sorted_by_tokens = sorted(fs, key=lambda f: -f.est_total_tokens)
+    cumulative = 0
+    threshold = p.est_total_tokens * 0.8
+    if threshold > 0:
+        for i, f in enumerate(sorted_by_tokens, start=1):
+            cumulative += f.est_total_tokens
+            if cumulative >= threshold:
+                p.sessions_for_80pct_tokens = i
+                break
+
+    # Top-5 most expensive sessions (by cost when priced, else by tokens).
+    def _rank_key(f: SessionFeatures) -> float:
+        return f.est_cost_usd if f.est_cost_usd is not None else f.est_total_tokens / 1e6
+    p.top_cost_sessions = [
+        {
+            "session_id": f.session_id,
+            "started_at": f.started_at.isoformat(),
+            "est_total_tokens": f.est_total_tokens,
+            "est_cost_usd": f.est_cost_usd,
+            "session_type": f.session_type.value if hasattr(f.session_type, "value") else str(f.session_type),
+        }
+        for f in sorted(fs, key=_rank_key, reverse=True)[:5]
+    ]
 
     return p

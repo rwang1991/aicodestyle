@@ -538,3 +538,59 @@ main { padding: 24px; max-width: 1280px; margin: 0 auto; display: flex; flex-dir
   color: var(--muted);
   margin-left: auto;
 }
+
+/* === Phase F: Token economy card =========================================== */
+.token-card { margin-top: 18px; }
+.token-card.hidden { display: none; }
+.token-card-header { margin-bottom: 14px; }
+.token-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.token-stat {
+  background: rgba(88,166,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.token-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.token-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  background: linear-gradient(90deg, #58a6ff, #a371f7);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.token-stat-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.token-top-sessions h4 {
+  margin: 18px 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.token-top-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.token-top-table th, .token-top-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.token-top-table th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
+.token-top-table td:nth-child(3), .token-top-table td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }

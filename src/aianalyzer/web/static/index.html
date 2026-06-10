@@ -154,6 +154,48 @@
 
     <section class="grid" id="kpi-grid"></section>
 
+    <section id="token-card" class="card token-card hidden">
+      <header class="token-card-header">
+        <h3>Token economy <span class="unit">(tiktoken estimate)</span></h3>
+        <p class="card-sub">
+          Token counts and USD cost are estimated offline with the
+          <code>cl100k_base</code> tokenizer (±5% on natural-language text)
+          and a curated 2026 list-price table. Sessions that ran on
+          proprietary / unpriced models contribute to token totals but not
+          to the dollar figure.
+        </p>
+      </header>
+      <div class="token-stats">
+        <div class="token-stat">
+          <div class="token-stat-label">Total tokens</div>
+          <div class="token-stat-value" id="tok-total">—</div>
+          <div class="token-stat-sub" id="tok-io">—</div>
+        </div>
+        <div class="token-stat">
+          <div class="token-stat-label">Estimated cost (USD)</div>
+          <div class="token-stat-value" id="tok-cost">—</div>
+          <div class="token-stat-sub" id="tok-priced">—</div>
+        </div>
+        <div class="token-stat">
+          <div class="token-stat-label">Output : input ratio</div>
+          <div class="token-stat-value" id="tok-ratio">—</div>
+          <div class="token-stat-sub" id="tok-style">—</div>
+        </div>
+        <div class="token-stat">
+          <div class="token-stat-label">Pareto (sessions for 80%)</div>
+          <div class="token-stat-value" id="tok-pareto">—</div>
+          <div class="token-stat-sub" id="tok-pareto-sub">—</div>
+        </div>
+      </div>
+      <div class="token-top-sessions">
+        <h4>Top 5 most expensive sessions</h4>
+        <table class="token-top-table">
+          <thead><tr><th>Started</th><th>Type</th><th>Tokens</th><th>Cost</th></tr></thead>
+          <tbody id="token-top-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="charts">
       <div class="card">
         <h3>Session types</h3>

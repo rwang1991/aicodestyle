@@ -262,3 +262,59 @@ def test_favorite_tool_insight_appears_when_top_tools_provided():
 def test_favorite_tool_insight_absent_when_no_tools():
     p = compute_personality(_profile(), [_feat()], top_tools=[])
     assert not any(d.title == "Favourite tool" for d in p.did_you_know)
+
+
+# ---------------------------------------------------------------------------
+# Phase F — token-economy DYK facts
+# ---------------------------------------------------------------------------
+
+def test_did_you_know_includes_token_burn_when_priced():
+    p = compute_personality(
+        _profile(), [_feat()],
+        est_total_tokens=2_500_000,
+        est_cost_usd=37.42,
+    )
+    text = " ".join(d.detail for d in p.did_you_know)
+    assert "2.5M tokens" in text
+    assert "$37.42" in text
+
+
+def test_did_you_know_includes_token_burn_when_unpriced():
+    p = compute_personality(
+        _profile(), [_feat()],
+        est_total_tokens=1_200_000,
+        est_cost_usd=0.0,
+    )
+    text = " ".join(d.detail for d in p.did_you_know)
+    assert "1.2M tokens" in text
+    assert "proprietary pricing" in text
+
+
+def test_did_you_know_flags_concentrated_token_spend():
+    p = compute_personality(
+        _profile(session_count=100), [_feat()],
+        est_total_tokens=10_000_000, est_cost_usd=100.0,
+        sessions_for_80pct_tokens=12,
+    )
+    titles = [d.title for d in p.did_you_know]
+    assert "Concentrated spender" in titles
+
+
+def test_did_you_know_flags_generator_style():
+    p = compute_personality(
+        _profile(), [_feat()],
+        est_total_tokens=200_000, est_cost_usd=2.0,
+        output_to_input_ratio=4.5,
+    )
+    titles = [d.title for d in p.did_you_know]
+    assert "Generator style" in titles
+
+
+def test_did_you_know_flags_reviewer_style():
+    p = compute_personality(
+        _profile(), [_feat()],
+        est_total_tokens=200_000, est_cost_usd=2.0,
+        output_to_input_ratio=0.4,
+    )
+    titles = [d.title for d in p.did_you_know]
+    assert "Reviewer style" in titles
