@@ -13,6 +13,33 @@ from pydantic import BaseModel, ConfigDict, Field
 from aianalyzer.classifier.session_types import SessionType, classify_session_type
 from aianalyzer.normalize import NormalizedSession, Turn
 
+# --- Token estimation (tiktoken cl100k_base; approximate for all model families)
+_encoder = None
+
+
+def _reset_encoder_cache() -> None:
+    """Test hook to drop the cached encoder."""
+    global _encoder
+    _encoder = None
+
+
+def _count_tokens(text: str | None) -> int:
+    """Estimate token count for a string using the cl100k_base BPE.
+
+    Returns 0 for empty/None input. We use a single tokenizer for every
+    model — this is intentional: cl100k_base is within ~5% of the actual
+    GPT-5 / Claude tokenisers on natural text, and bundling per-vendor
+    tokenizers would double the .exe size for marginal accuracy gains.
+    """
+    if not text:
+        return 0
+    global _encoder
+    if _encoder is None:
+        import tiktoken
+        _encoder = tiktoken.get_encoding("cl100k_base")
+    return len(_encoder.encode(text, disallowed_special=()))
+
+
 _PLANNING_TOKENS = (
     "plan", "design", "approach", "options", "tradeoff", "before we code",
     "propose", "outline", "architecture",
@@ -116,6 +143,13 @@ class SessionFeatures(BaseModel):
     first_user_msg_at: datetime | None = None
     last_user_msg_at: datetime | None = None
     first_words: list[str] = Field(default_factory=list)
+
+    # Token economy (Phase F) — tiktoken cl100k_base estimates
+    est_input_tokens: int = 0
+    est_output_tokens: int = 0
+    est_total_tokens: int = 0
+    est_cost_usd: float | None = None
+    priced_token_share: float = 0.0
 
 
 def _user_messages(turns: Iterable[Turn]) -> list[str]:
@@ -420,6 +454,32 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         create_tool_calls=create_tool_calls,
     )
 
+    # Token economy (Phase F). Token counts are estimated with tiktoken
+    # cl100k_base (±5% on natural text across Claude/GPT families). Per-turn
+    # model attribution is used so a session that mixed Opus and Haiku gets
+    # a blended cost. `priced_token_share` is the fraction of tokens whose
+    # model has a published price; unpriced tokens contribute to total tokens
+    # but not to USD cost.
+    from aianalyzer.pricing import estimate_cost_usd
+    est_in = 0
+    est_out = 0
+    priced_tokens = 0
+    cost_usd = 0.0
+    has_priced_turn = False
+    for t in turns:
+        tin = _count_tokens(t.user.content) if t.user is not None else 0
+        tout = _count_tokens(t.assistant.content) if t.assistant is not None else 0
+        est_in += tin
+        est_out += tout
+        if t.assistant is not None:
+            c = estimate_cost_usd(t.assistant.model, tin, tout)
+            if c is not None:
+                cost_usd += c
+                priced_tokens += tin + tout
+                has_priced_turn = True
+    est_total = est_in + est_out
+    priced_share = (priced_tokens / est_total) if est_total > 0 else 0.0
+
     return SessionFeatures(
         session_id=session.session_id,
         client=session.client,
@@ -460,6 +520,11 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         first_user_msg_at=first_user_msg_at,
         last_user_msg_at=last_user_msg_at,
         first_words=first_words,
+        est_input_tokens=est_in,
+        est_output_tokens=est_out,
+        est_total_tokens=est_total,
+        est_cost_usd=(cost_usd if has_priced_turn else None),
+        priced_token_share=priced_share,
     )
 
 

@@ -57,5 +57,8 @@ def test_all_signal_fields_defined():
         # Prompt-mined facts (Phase C vivid report)
         "longest_prompt_words", "total_user_words",
         "first_user_msg_at", "last_user_msg_at", "first_words",
+        # Token economy (Phase F)
+        "est_input_tokens", "est_output_tokens", "est_total_tokens",
+        "est_cost_usd", "priced_token_share",
     }
     assert set(SessionFeatures.model_fields.keys()) == expected_fields

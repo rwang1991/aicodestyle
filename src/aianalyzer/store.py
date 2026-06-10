@@ -14,7 +14,9 @@ from aianalyzer.features import SessionFeatures
 # v8: prompt-mined facts (Phase C) — longest_prompt_words, total_user_words,
 #     first/last_user_msg_at, first_words.
 # v9: first_words preserves apostrophes ("let's" instead of "lets").
-SCHEMA_VERSION = 9
+# v10: token economy (Phase F) — est_input_tokens, est_output_tokens,
+#      est_total_tokens, est_cost_usd, priced_token_share.
+SCHEMA_VERSION = 10
 
 
 class FeatureStore:
