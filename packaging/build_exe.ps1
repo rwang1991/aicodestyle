@@ -30,6 +30,12 @@ try {
     if ($Clean -or (Test-Path build)) { Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue }
     if ($Clean -or (Test-Path dist))  { Remove-Item -Recurse -Force dist  -ErrorAction SilentlyContinue }
 
+    # Force `import aianalyzer` (used by collect_data_files inside the spec)
+    # to resolve to THIS worktree's src, not a sibling editable install. This
+    # matters when developing in multiple git worktrees: without this pin,
+    # PyInstaller silently bundles the other worktree's static/ assets.
+    $env:PYTHONPATH = (Join-Path $repoRoot "src")
+
     Write-Host "==> Building aianalyzer (one-folder bundle)" -ForegroundColor Cyan
     python -m PyInstaller packaging/aianalyzer.spec --clean --noconfirm
 
