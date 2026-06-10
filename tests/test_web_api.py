@@ -49,6 +49,16 @@ def test_scan_then_profile_end_to_end(tmp_path, monkeypatch):
         assert "ceiling" in row and row["ceiling"] > 0
         assert "raw" in row
 
+    # Personality block: nickname, tagline, badges, did-you-know. With an
+    # empty cache the personality fallback nickname is shown.
+    assert "personality" in p
+    pers = p["personality"]
+    assert pers["nickname"] == "The Newcomer"
+    assert isinstance(pers["badges"], list)
+    assert isinstance(pers["did_you_know"], list)
+    assert pers["badges"] == []        # no sessions -> no badges
+    assert pers["did_you_know"] == []  # no sessions -> no insights
+
 
 def test_behavior_radar_normalizes_against_ceiling(tmp_path, monkeypatch):
     """A raw signal at or above its ceiling reads score=1.0; halfway reads

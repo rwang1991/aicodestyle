@@ -16,6 +16,7 @@ from aianalyzer.discovery import (
     discover_vscode_copilot_sessions,
 )
 from aianalyzer.features import UserProfile, aggregate_user_profile, extract_session_features
+from aianalyzer.insights import compute_personality
 from aianalyzer.stats import compute_extended_profile
 from aianalyzer.store import FeatureStore
 
@@ -285,4 +286,5 @@ def load_profile_payload() -> dict[str, Any]:
         "first_session_at": ext.first_session_at.isoformat() if ext.first_session_at else None,
         "last_session_at": ext.last_session_at.isoformat() if ext.last_session_at else None,
         "behavior": _build_behavior_block(user_profile),
+        "personality": compute_personality(user_profile, features).model_dump(),
     }
