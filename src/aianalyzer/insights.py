@@ -28,7 +28,6 @@ class AIPersonality(BaseModel):
     model_config = ConfigDict(frozen=True)
     nickname: str
     tagline: str
-    archetype_emoji: str = ""
     badges: list[Insight] = Field(default_factory=list)
     did_you_know: list[Insight] = Field(default_factory=list)
 
@@ -39,14 +38,6 @@ _ARCHETYPE_WORD = {
     Archetype.TINKERER: "Tinkerer",
     Archetype.VIBE_CODER: "Vibe Coder",
 }
-
-_ARCHETYPE_EMOJI = {
-    Archetype.ARCHITECT: "🏛️",
-    Archetype.PILOT: "🎯",
-    Archetype.TINKERER: "🛠️",
-    Archetype.VIBE_CODER: "✨",
-}
-_NEWCOMER_EMOJI = "🌱"
 
 _ARCHETYPE_TAGLINE = {
     Archetype.ARCHITECT: "Plans the work, then drives the tools.",
@@ -113,13 +104,6 @@ def _tagline(profile: UserProfile) -> str:
         return "Run a scan to discover your AI partnership style."
     result = classify(profile)
     return _ARCHETYPE_TAGLINE.get(result.primary, "Your AI coding style.")
-
-
-def _archetype_emoji(profile: UserProfile) -> str:
-    if profile.session_count == 0:
-        return _NEWCOMER_EMOJI
-    result = classify(profile)
-    return _ARCHETYPE_EMOJI.get(result.primary, _NEWCOMER_EMOJI)
 
 
 def _badges(
@@ -301,7 +285,6 @@ def compute_personality(
     return AIPersonality(
         nickname=_nickname(profile, features),
         tagline=_tagline(profile),
-        archetype_emoji=_archetype_emoji(profile),
         badges=_badges(profile, features, longest_streak_days=longest_streak_days),
         did_you_know=_did_you_know(profile, features, top_tools=top_tools),
     )

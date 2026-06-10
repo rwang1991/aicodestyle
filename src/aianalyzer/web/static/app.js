@@ -267,8 +267,6 @@
       return;
     }
     card.classList.remove("hidden");
-    const avatarEl = card.querySelector(".personality-avatar");
-    if (avatarEl) avatarEl.textContent = personality.archetype_emoji || "";
     card.querySelector(".personality-nickname").textContent = personality.nickname || "";
     card.querySelector(".personality-tagline").textContent = personality.tagline || "";
 

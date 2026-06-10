@@ -115,27 +115,6 @@ def test_handles_empty_session_list():
     assert p.did_you_know == []
 
 
-def test_archetype_emoji_is_set_for_known_archetypes():
-    # An archetype that resolves cleanly should yield a non-empty emoji.
-    p = compute_personality(
-        _profile(
-            planning_language_ratio=0.8,
-            prompt_specificity_avg=0.7,
-            file_reference_rate=0.6,
-            accept_and_go_ratio=0.05,
-        ),
-        [_feat()],
-    )
-    assert p.archetype_emoji
-    assert len(p.archetype_emoji) > 0
-
-
-def test_archetype_emoji_defaults_for_empty_profile():
-    # Newcomer still gets *some* emoji so the UI never renders a void.
-    p = compute_personality(UserProfile(), [])
-    assert p.archetype_emoji
-
-
 def test_streak_badge_appears_when_longest_streak_meets_threshold():
     p = compute_personality(
         _profile(),
