@@ -64,7 +64,7 @@ def test_behavior_radar_normalizes_against_ceiling(tmp_path, monkeypatch):
         planning_language_ratio=0.6,   # ceiling 0.6
         question_ratio=0.3,            # ceiling 0.6 -> 0.5
         total_todos=20,                # 20/10 = 2.0 == ceiling
-        tool_diversity=2.0,            # ceiling 2.0
+        prompt_specificity_avg=0.5,    # ceiling 0.5 (Hands-on spoke)
         thinks_before_prompt_sec_avg=120.0,  # ceiling 60 -> clamps to 1.0
         parallel_tool_call_rate=0.25,  # ceiling 1.0
     )

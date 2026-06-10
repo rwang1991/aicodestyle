@@ -188,7 +188,8 @@
       control: {
         label: "Control",
         help: "How hands-on you stay while the AI works. Positive = you " +
-          "drive the tools yourself; negative = you let the AI run.",
+          "direct with specific prompts, paste code, name files; " +
+          "negative = you give short prompts and let the AI run.",
       },
     };
     for (const [k, meta] of Object.entries(AXIS_META)) {
@@ -516,6 +517,10 @@
     revision_depth: "How many follow-up turns you typically spend refining a single thread.",
     question_ratio: "Share of prompts containing a question mark or starting with a question word.",
     thinks_before_prompt_sec_avg: "Mean idle seconds between AI replies and your next prompt (capped at 5 min to ignore breaks).",
+    prompt_specificity_avg: "Average detail in your prompts (word count / 200, capped). High = you write long, specific instructions.",
+    code_block_density: "Share of prompts that paste a code block. High = you bring code to the conversation.",
+    file_reference_rate: "Share of prompts that cite a file path, :line, function(), or @file. High = you direct the AI to specific places.",
+    ai_agency_rate: "Average AI tool calls per user message. High = AI is doing more autonomous work per prompt (hands-off).",
     tool_diversity: "Distinct tool types you invoke per session — bigger = you reach for many tools.",
     edited_files_per_turn: "Average number of files touched per user turn.",
     accept_and_go_rate: "Share of turns where you ship the AI's first response without revisions.",
