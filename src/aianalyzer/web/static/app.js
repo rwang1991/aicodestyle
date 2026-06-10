@@ -267,6 +267,12 @@
       return;
     }
     card.classList.remove("hidden");
+    const glyphEl = card.querySelector(".personality-glyph");
+    if (glyphEl) {
+      glyphEl.textContent = personality.archetype_glyph || "✦";
+      glyphEl.dataset.archetype = personality.archetype_key || "newcomer";
+      glyphEl.setAttribute("aria-label", `${personality.nickname || "Profile"} avatar`);
+    }
     card.querySelector(".personality-nickname").textContent = personality.nickname || "";
     card.querySelector(".personality-tagline").textContent = personality.tagline || "";
 

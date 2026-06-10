@@ -29,6 +29,8 @@ class AIPersonality(BaseModel):
     model_config = ConfigDict(frozen=True)
     nickname: str
     tagline: str
+    archetype_key: str = "newcomer"  # "architect" | "pilot" | "tinkerer" | "vibe-coder" | "newcomer"
+    archetype_glyph: str = "✦"
     badges: list[Insight] = Field(default_factory=list)
     did_you_know: list[Insight] = Field(default_factory=list)
 
@@ -46,6 +48,15 @@ _ARCHETYPE_TAGLINE = {
     Archetype.TINKERER: "Hands deep in the code, learning by doing.",
     Archetype.VIBE_CODER: "Trusts the flow — fast, instinctive, light-touch.",
 }
+
+# Bold unicode glyphs (not emoji) — crisp at any size, consistent across OSes.
+_ARCHETYPE_GLYPH = {
+    Archetype.ARCHITECT: "◈",   # diamond = blueprint / structure
+    Archetype.PILOT: "➤",       # arrow = direction
+    Archetype.TINKERER: "⚙",   # gear = tinkering
+    Archetype.VIBE_CODER: "♪",  # note = flow / vibe
+}
+_NEWCOMER_GLYPH = "✦"
 
 _DAY_NAMES = (
     "Monday", "Tuesday", "Wednesday", "Thursday",
@@ -89,6 +100,16 @@ def _adjective_for(profile: UserProfile, features: list[SessionFeatures]) -> str
     if profile.question_ratio > 0.4:
         return "Curious"
     return "Steady"
+
+
+def _archetype_key_and_glyph(
+    profile: UserProfile,
+) -> tuple[str, str]:
+    """Return (archetype_key, glyph) — newcomer fallback when no sessions."""
+    if profile.session_count == 0:
+        return "newcomer", _NEWCOMER_GLYPH
+    result = classify(profile)
+    return result.primary.value, _ARCHETYPE_GLYPH.get(result.primary, _NEWCOMER_GLYPH)
 
 
 def _nickname(profile: UserProfile, features: list[SessionFeatures]) -> str:
@@ -397,9 +418,12 @@ def compute_personality(
     top_first_words: list[tuple[str, int]] | None = None,
 ) -> AIPersonality:
     """Compute the human-friendly personality bundle for the portal hero."""
+    arch_key, arch_glyph = _archetype_key_and_glyph(profile)
     return AIPersonality(
         nickname=_nickname(profile, features),
         tagline=_tagline(profile),
+        archetype_key=arch_key,
+        archetype_glyph=arch_glyph,
         badges=_badges(profile, features, longest_streak_days=longest_streak_days),
         did_you_know=_did_you_know(
             profile,

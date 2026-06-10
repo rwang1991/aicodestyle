@@ -210,6 +210,24 @@ def test_handles_empty_session_list():
     assert p.did_you_know == []
 
 
+def test_newcomer_archetype_key_and_glyph_when_no_sessions():
+    p = compute_personality(UserProfile(), [])
+    assert p.archetype_key == "newcomer"
+    assert p.archetype_glyph == "✦"
+
+
+def test_archetype_key_and_glyph_match_classification():
+    p = compute_personality(_profile(
+        planning_language_ratio=0.8,
+        prompt_specificity_avg=0.7,
+        file_reference_rate=0.6,
+        accept_and_go_ratio=0.05,
+    ), [_feat()])
+    # Whatever the classifier picks, key + glyph must be one of the known set.
+    assert p.archetype_key in {"architect", "pilot", "tinkerer", "vibe-coder"}
+    assert p.archetype_glyph in {"◈", "➤", "⚙", "♪"}
+
+
 def test_streak_badge_appears_when_longest_streak_meets_threshold():
     p = compute_personality(
         _profile(),
