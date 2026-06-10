@@ -37,6 +37,24 @@ class ExtendedProfile:
     # actually came from. Each value is { sessions, turns, hours, tool_calls }.
     by_client: dict[str, dict[str, float]] = field(default_factory=dict)
 
+    # Prompt-mined aggregates (Phase C vivid report). The portal drops these
+    # into the "Did you know?" hero list so the user sees things they actually
+    # typed — their longest prompt, the latest hour they ever asked the AI for
+    # something, their favourite opener, their marathon session, etc.
+    longest_prompt_words: int = 0
+    longest_prompt_session_started_at: datetime | None = None
+    total_user_words: int = 0
+    marathon_session_minutes: float = 0.0
+    marathon_session_started_at: datetime | None = None
+    latest_prompt_local_hm: tuple[int, int] | None = None
+    latest_prompt_at: datetime | None = None
+    earliest_prompt_local_hm: tuple[int, int] | None = None
+    earliest_prompt_at: datetime | None = None
+    peak_day_count: int = 0
+    peak_day_date: date | None = None
+    weekend_session_pct: float = 0.0
+    top_first_words: list[tuple[str, int]] = field(default_factory=list)
+
 
 def _percentile(values: list[float], q: float) -> float:
     if not values:
@@ -149,5 +167,61 @@ def compute_extended_profile(features: Iterable[SessionFeatures]) -> ExtendedPro
     for v in by_client.values():
         v["hours"] = round(v["hours"], 2)
     p.by_client = by_client
+
+    # -----------------------------------------------------------------
+    # Phase C: prompt-mined aggregates
+    # -----------------------------------------------------------------
+
+    # Marathon (single longest engaged session).
+    max_f = max(fs, key=lambda f: f.session_duration_sec)
+    p.marathon_session_minutes = max_f.session_duration_sec / 60.0
+    p.marathon_session_started_at = max_f.started_at
+
+    # Longest single prompt across all sessions.
+    candidates = [f for f in fs if f.longest_prompt_words > 0]
+    if candidates:
+        lf = max(candidates, key=lambda f: f.longest_prompt_words)
+        p.longest_prompt_words = lf.longest_prompt_words
+        p.longest_prompt_session_started_at = lf.started_at
+
+    # Total words the user has ever typed to AI.
+    p.total_user_words = sum(f.total_user_words for f in fs)
+
+    # Latest / earliest prompt by local time-of-day. We want "the most extreme
+    # hour you ever typed a prompt", regardless of date — so we compare on
+    # (hour, minute) tuples after converting each timestamp to local time.
+    def _hm(ts: datetime) -> tuple[int, int]:
+        local = ts.astimezone()
+        return (local.hour, local.minute)
+
+    last_with_hm = [(f.last_user_msg_at, _hm(f.last_user_msg_at)) for f in fs if f.last_user_msg_at]
+    if last_with_hm:
+        # Pick the session whose latest prompt has the largest (hour, minute)
+        # tuple but tie-break on the timestamp itself for deterministic
+        # behaviour when multiple sessions hit the same wall-clock time.
+        ts, hm = max(last_with_hm, key=lambda x: (x[1], x[0]))
+        p.latest_prompt_local_hm = hm
+        p.latest_prompt_at = ts
+
+    first_with_hm = [(f.first_user_msg_at, _hm(f.first_user_msg_at)) for f in fs if f.first_user_msg_at]
+    if first_with_hm:
+        ts, hm = min(first_with_hm, key=lambda x: (x[1], x[0]))
+        p.earliest_prompt_local_hm = hm
+        p.earliest_prompt_at = ts
+
+    # Peak single calendar day.
+    if by_day:
+        peak_date, peak_count = by_day.most_common(1)[0]
+        p.peak_day_date = peak_date
+        p.peak_day_count = peak_count
+
+    # Weekend %.
+    p.weekend_session_pct = sum(1 for f in fs if f.started_weekday in (5, 6)) / len(fs)
+
+    # Top prompt openers.
+    fw_counter: Counter[str] = Counter()
+    for f in fs:
+        fw_counter.update(f.first_words)
+    p.top_first_words = fw_counter.most_common(5)
 
     return p

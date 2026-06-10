@@ -129,3 +129,104 @@ def test_top_file_extensions():
     assert exts.get(".py") == 4  # a.py, b.py, x.py, z.py
     assert exts.get(".md") == 1
     assert exts.get(".ts") == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase C: prompt-mined aggregates
+# ---------------------------------------------------------------------------
+
+
+def test_marathon_session_picks_max_engaged_duration():
+    sessions = [
+        _sf(session_id="short", session_duration_sec=600.0,
+            started_at=datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc)),
+        _sf(session_id="long", session_duration_sec=22320.0,  # 372 min
+            started_at=datetime(2026, 3, 12, 9, 0, tzinfo=timezone.utc)),
+        _sf(session_id="mid", session_duration_sec=5400.0,
+            started_at=datetime(2026, 6, 2, 14, 0, tzinfo=timezone.utc)),
+    ]
+    p = compute_extended_profile(sessions)
+    assert p.marathon_session_minutes == pytest.approx(372.0)
+    assert p.marathon_session_started_at == datetime(2026, 3, 12, 9, 0, tzinfo=timezone.utc)
+
+
+def test_longest_prompt_aggregation():
+    sessions = [
+        _sf(session_id="a", longest_prompt_words=42, total_user_words=120,
+            started_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)),
+        _sf(session_id="b", longest_prompt_words=380, total_user_words=900,
+            started_at=datetime(2026, 5, 2, 11, 0, tzinfo=timezone.utc)),
+        _sf(session_id="c", longest_prompt_words=10, total_user_words=30),
+    ]
+    p = compute_extended_profile(sessions)
+    assert p.longest_prompt_words == 380
+    assert p.longest_prompt_session_started_at == datetime(2026, 5, 2, 11, 0, tzinfo=timezone.utc)
+    assert p.total_user_words == 120 + 900 + 30
+
+
+def test_latest_and_earliest_prompt_local_hm_picks_extreme_local_time():
+    morning = datetime(2026, 6, 1, 5, 14, tzinfo=timezone.utc)   # local hour 5
+    evening = datetime(2026, 6, 1, 13, 30, tzinfo=timezone.utc)  # local hour 13
+    midnight = datetime(2026, 6, 1, 2, 47, tzinfo=timezone.utc)  # local hour 2
+    sessions = [
+        _sf(session_id="m", first_user_msg_at=morning, last_user_msg_at=morning),
+        _sf(session_id="e", first_user_msg_at=evening, last_user_msg_at=evening),
+        _sf(session_id="n", first_user_msg_at=midnight, last_user_msg_at=midnight),
+    ]
+    p = compute_extended_profile(sessions)
+
+    # earliest_local_hm = min hour-of-day
+    assert p.earliest_prompt_local_hm == (midnight.astimezone().hour, midnight.astimezone().minute)
+    assert p.earliest_prompt_at == midnight
+    # latest_local_hm = max hour-of-day
+    assert p.latest_prompt_local_hm == (evening.astimezone().hour, evening.astimezone().minute)
+    assert p.latest_prompt_at == evening
+
+
+def test_peak_day_picks_busiest_calendar_day():
+    sessions = (
+        [_sf(session_id=f"a{i}", started_at=datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc)) for i in range(5)]
+        + [_sf(session_id=f"b{i}", started_at=datetime(2026, 6, 2, 10, 0, tzinfo=timezone.utc)) for i in range(2)]
+    )
+    p = compute_extended_profile(sessions)
+    # Peak day is computed in local time, so just check the count is correct.
+    assert p.peak_day_count == 5
+    assert p.peak_day_date is not None
+
+
+def test_weekend_session_pct_counts_saturday_and_sunday():
+    sessions = [
+        _sf(session_id="mon", started_weekday=0),
+        _sf(session_id="tue", started_weekday=1),
+        _sf(session_id="sat", started_weekday=5),
+        _sf(session_id="sun", started_weekday=6),
+    ]
+    p = compute_extended_profile(sessions)
+    assert p.weekend_session_pct == pytest.approx(0.5)
+
+
+def test_top_first_words_aggregates_across_sessions():
+    sessions = [
+        _sf(session_id="a", first_words=["fix", "fix", "add"]),
+        _sf(session_id="b", first_words=["fix", "create", "add"]),
+    ]
+    p = compute_extended_profile(sessions)
+    tw = dict(p.top_first_words)
+    assert tw["fix"] == 3
+    assert tw["add"] == 2
+    assert tw["create"] == 1
+
+
+def test_empty_profile_has_zeroed_prompt_aggregates():
+    p = compute_extended_profile([])
+    assert p.longest_prompt_words == 0
+    assert p.longest_prompt_session_started_at is None
+    assert p.total_user_words == 0
+    assert p.marathon_session_minutes == 0.0
+    assert p.marathon_session_started_at is None
+    assert p.latest_prompt_local_hm is None
+    assert p.earliest_prompt_local_hm is None
+    assert p.peak_day_count == 0
+    assert p.peak_day_date is None
+    assert p.weekend_session_pct == 0.0
+    assert p.top_first_words == []
