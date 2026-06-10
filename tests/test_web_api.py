@@ -98,7 +98,7 @@ def test_profile_includes_behavior_block_with_modifiers(tmp_path, monkeypatch):
     plan_names = {row["name"] for row in b["planning"]}
     assert {"planning_language_ratio", "question_ratio", "todo_density"} <= plan_names
     ctrl_names = {row["name"] for row in b["control"]}
-    assert {"tool_diversity", "accept_and_go_ratio", "tool_error_rate"} <= ctrl_names
+    assert {"prompt_specificity_avg", "accept_and_go_ratio", "ai_agency_rate"} <= ctrl_names
 
     # Every planning/control row carries its normalizer ceiling so the bar can
     # render value/norm_max correctly.

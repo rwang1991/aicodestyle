@@ -8,13 +8,20 @@ planning:
   test_or_spec_mention_rate: 0.6
   todo_density: 0.8
 control:
-  tool_diversity: 0.6
-  edited_files_per_turn_avg: 0.4
-  accept_and_go_ratio: -1.0
-  revision_depth: -0.3
-  tool_error_rate: 0.2
+  # Hands-on = user directs; hands-off = AI runs autonomously.
+  # Signals derived from user-typed content + agency ratio. We do NOT use
+  # tool_diversity / edited_files_per_turn_avg here: in agentic sessions the
+  # AI calls all the tools, so those signals measure AI activity, not user agency.
+  prompt_specificity_avg: 0.8     # detailed prompts = hands-on
+  code_block_density: 0.6         # pasting code = hands-on
+  file_reference_rate: 0.7        # naming files / line refs = hands-on
+  accept_and_go_ratio: -1.0       # "yes do it" replies = hands-off (strongest signal)
+  ai_agency_rate: -0.5            # many tool calls per prompt = AI doing the work
 
 # Normalizers map raw signal -> [0, 1] via linear clamp.
+# Old signals (tool_diversity, edited_files_per_turn_avg, revision_depth,
+# tool_error_rate) are KEPT here because they still feed the modifier rules
+# and the raw-signal panels in the portal.
 normalizers:
   planning_language_ratio: {min: 0.0, max: 0.6}
   question_ratio: {min: 0.0, max: 0.6}
@@ -26,6 +33,10 @@ normalizers:
   accept_and_go_ratio: {min: 0.0, max: 0.6}
   revision_depth: {min: 0.0, max: 4.0}
   tool_error_rate: {min: 0.0, max: 0.4}
+  prompt_specificity_avg: {min: 0.0, max: 0.5}
+  code_block_density: {min: 0.0, max: 0.4}
+  file_reference_rate: {min: 0.0, max: 0.6}
+  ai_agency_rate: {min: 0.0, max: 8.0}
 
 modifiers:
   questioner_min_question_ratio: 0.4

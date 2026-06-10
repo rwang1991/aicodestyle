@@ -20,11 +20,13 @@ def test_architect_quadrant_high_planning_high_control():
         thinks_before_prompt_sec_avg=60.0,
         test_or_spec_mention_rate=0.4,
         total_todos=3,
-        tool_diversity=2.0,
-        edited_files_per_turn_avg=3.0,
+        # Hands-on (Phase A): detailed prompts, code blocks, file refs,
+        # low accept-and-go, low AI agency.
+        prompt_specificity_avg=0.5,
+        code_block_density=0.4,
+        file_reference_rate=0.6,
         accept_and_go_ratio=0.0,
-        revision_depth=0.5,
-        tool_error_rate=0.1,
+        ai_agency_rate=0.5,
     )
     r = classify(p, weights=weights)
     assert r.primary == Archetype.ARCHITECT
@@ -40,11 +42,13 @@ def test_vibe_coder_quadrant_low_planning_low_control():
         thinks_before_prompt_sec_avg=2.0,
         test_or_spec_mention_rate=0.0,
         total_todos=0,
-        tool_diversity=0.2,
-        edited_files_per_turn_avg=0.5,
+        # Hands-off: short prompts, no code, no file refs, high accept-and-go,
+        # high AI agency.
+        prompt_specificity_avg=0.0,
+        code_block_density=0.0,
+        file_reference_rate=0.0,
         accept_and_go_ratio=0.6,
-        revision_depth=3.0,
-        tool_error_rate=0.0,
+        ai_agency_rate=8.0,
     )
     r = classify(p, weights=weights)
     assert r.primary == Archetype.VIBE_CODER
@@ -63,9 +67,10 @@ def test_pilot_quadrant_high_planning_low_control():
         total_todos=3,
         # Hands-off control side
         accept_and_go_ratio=0.5,
-        revision_depth=3.0,
-        tool_diversity=0.0,
-        edited_files_per_turn_avg=0.0,
+        prompt_specificity_avg=0.0,
+        code_block_density=0.0,
+        file_reference_rate=0.0,
+        ai_agency_rate=8.0,
     )
     r = classify(p, weights=weights)
     assert r.primary == Archetype.PILOT
@@ -79,10 +84,12 @@ def test_tinkerer_quadrant_low_planning_high_control():
         planning_language_ratio=0.0,
         question_ratio=0.0,
         thinks_before_prompt_sec_avg=0.0,
-        tool_diversity=2.0,
-        edited_files_per_turn_avg=5.0,
+        # Hands-on control side
+        prompt_specificity_avg=0.5,
+        code_block_density=0.4,
+        file_reference_rate=0.6,
         accept_and_go_ratio=0.0,
-        revision_depth=0.5,
+        ai_agency_rate=0.5,
     )
     r = classify(p, weights=weights)
     assert r.primary == Archetype.TINKERER
@@ -98,9 +105,11 @@ def test_secondary_set_when_planning_axis_near_zero():
         thinks_before_prompt_sec_avg=30.0,  # 60/2
         test_or_spec_mention_rate=0.2,  # 0.4/2
         total_todos=1,                  # todo_density=1.0 -> 2.0/2
-        tool_diversity=2.0,
-        edited_files_per_turn_avg=4.0,
+        prompt_specificity_avg=0.5,
+        code_block_density=0.4,
+        file_reference_rate=0.6,
         accept_and_go_ratio=0.0,
+        ai_agency_rate=0.0,
     )
     r = classify(p, weights=weights)
     # With planning ~ 0, primary lands in the control-positive row
