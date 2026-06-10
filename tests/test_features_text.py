@@ -54,5 +54,8 @@ def test_all_signal_fields_defined():
         # Hands-on signals (Phase A axis rework)
         "prompt_specificity_avg", "code_block_density",
         "file_reference_rate", "ai_agency_rate",
+        # Prompt-mined facts (Phase C vivid report)
+        "longest_prompt_words", "total_user_words",
+        "first_user_msg_at", "last_user_msg_at", "first_words",
     }
     assert set(SessionFeatures.model_fields.keys()) == expected_fields

@@ -6,6 +6,7 @@ human-friendly bundle the portal renders prominently in the hero card.
 from __future__ import annotations
 
 from collections import Counter
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -203,71 +204,172 @@ def _badges(
     return badges
 
 
+def _fmt_date(d: date | datetime) -> str:
+    """Format a date as 'Mon D' (cross-platform — avoids %-d / %#d footguns)."""
+    if isinstance(d, datetime):
+        d = d.astimezone().date()
+    return f"{d.strftime('%b')} {d.day}"
+
+
+def _fmt_duration_minutes(minutes: float) -> str:
+    total = int(round(minutes))
+    h, m = divmod(total, 60)
+    return f"{h}h {m}m" if h else f"{m}m"
+
+
+def _fmt_hour_minute(hm: tuple[int, int]) -> str:
+    h, m = hm
+    suffix = "AM" if h < 12 else "PM"
+    h12 = h % 12 or 12
+    return f"{h12}:{m:02d} {suffix}"
+
+
 def _did_you_know(
     profile: UserProfile,
     features: list[SessionFeatures],
     *,
     top_tools: list[tuple[str, int]] | None = None,
+    total_user_words: int = 0,
+    longest_prompt_words: int = 0,
+    longest_prompt_at: datetime | None = None,
+    marathon_session_minutes: float = 0.0,
+    marathon_session_at: datetime | None = None,
+    latest_prompt_local_hm: tuple[int, int] | None = None,
+    latest_prompt_at: datetime | None = None,
+    earliest_prompt_local_hm: tuple[int, int] | None = None,
+    earliest_prompt_at: datetime | None = None,
+    peak_day_count: int = 0,
+    peak_day_date: date | None = None,
+    weekend_session_pct: float = 0.0,
+    top_first_words: list[tuple[str, int]] | None = None,
 ) -> list[Insight]:
+    """Vivid prompt-mined facts. Each item is gated on its data being meaningful.
+
+    Order is by rank (highest first). The UI shows them all in a collapsible
+    expander, so we err on the side of including more.
+    """
     insights: list[Insight] = []
     if not features:
         return insights
 
-    insights.append(Insight(
-        kind="did_you_know", icon="💬", title="Total sessions",
-        detail=f"You've run {profile.session_count} sessions and exchanged "
-               f"{profile.total_turns} turns with AI.",
-        rank=100,
-    ))
-
-    if profile.session_duration_sec > 0:
-        avg_min = profile.session_duration_sec / 60
+    # 1) Total prompts you've typed
+    if total_user_words > 0:
+        # ~260 words per typical book page; "small novel" is ~50k words.
+        pages = max(1, total_user_words // 260)
         insights.append(Insight(
-            kind="did_you_know", icon="⏱", title="Time with AI",
-            detail=f"Your average engaged session lasts {avg_min:.1f} minutes.",
-            rank=80,
+            kind="did_you_know", icon="💬", title="Words typed",
+            detail=(
+                f"You've typed {total_user_words:,} words to AI across "
+                f"{profile.session_count} sessions — about {pages:,} pages of text."
+            ),
+            rank=100,
+        ))
+    else:
+        insights.append(Insight(
+            kind="did_you_know", icon="💬", title="Total sessions",
+            detail=f"You've run {profile.session_count} sessions and exchanged "
+                   f"{profile.total_turns} turns with AI.",
+            rank=100,
         ))
 
+    # 2) Marathon session (single longest)
+    if marathon_session_minutes >= 30 and marathon_session_at is not None:
+        insights.append(Insight(
+            kind="did_you_know", icon="🏃", title="Marathon session",
+            detail=(
+                f"Your longest session lasted {_fmt_duration_minutes(marathon_session_minutes)} "
+                f"on {_fmt_date(marathon_session_at)} — even after idle gaps were trimmed."
+            ),
+            rank=95,
+        ))
+
+    # 3) Longest single prompt
+    if longest_prompt_words >= 50 and longest_prompt_at is not None:
+        insights.append(Insight(
+            kind="did_you_know", icon="📜", title="Longest prompt",
+            detail=(
+                f"Your most detailed prompt was {longest_prompt_words:,} words long — "
+                f"written on {_fmt_date(longest_prompt_at)}."
+            ),
+            rank=88,
+        ))
+
+    # 4) Latest hour you ever worked (night owl moment)
+    if latest_prompt_local_hm is not None and latest_prompt_at is not None:
+        h = latest_prompt_local_hm[0]
+        if h >= 22 or h <= 4:
+            insights.append(Insight(
+                kind="did_you_know", icon="🌙", title="Night-owl moment",
+                detail=(
+                    f"You once fired off a prompt at {_fmt_hour_minute(latest_prompt_local_hm)} "
+                    f"on {_fmt_date(latest_prompt_at)}. The AI was awake too."
+                ),
+                rank=85,
+            ))
+
+    # 5) Earliest hour you ever worked (early bird moment)
+    if earliest_prompt_local_hm is not None and earliest_prompt_at is not None:
+        h = earliest_prompt_local_hm[0]
+        if h <= 7:
+            insights.append(Insight(
+                kind="did_you_know", icon="🌅", title="Early-bird moment",
+                detail=(
+                    f"Your earliest prompt of the day landed at "
+                    f"{_fmt_hour_minute(earliest_prompt_local_hm)} on {_fmt_date(earliest_prompt_at)}."
+                ),
+                rank=80,
+            ))
+
+    # 6) Peak day (busiest single calendar day)
+    if peak_day_count >= 3 and peak_day_date is not None:
+        insights.append(Insight(
+            kind="did_you_know", icon="🔥", title="Peak day",
+            detail=(
+                f"Your busiest single day was {_fmt_date(peak_day_date)} — "
+                f"{peak_day_count} sessions in one day."
+            ),
+            rank=75,
+        ))
+
+    # 7) Favourite opener (most common first word across all prompts)
+    if top_first_words:
+        word, count = top_first_words[0]
+        if count >= 3:
+            insights.append(Insight(
+                kind="did_you_know", icon="🗣", title="Favourite opener",
+                detail=(
+                    f"You start prompts with “{word}” more than any other word — "
+                    f"{count:,} times."
+                ),
+                rank=70,
+            ))
+
+    # 8) Weekend %
+    if weekend_session_pct >= 0.20:
+        pct = round(100 * weekend_session_pct)
+        insights.append(Insight(
+            kind="did_you_know", icon="🎉", title="Weekend warrior",
+            detail=f"{pct}% of your sessions happen on weekends.",
+            rank=65,
+        ))
+
+    # 9) Favourite tool
+    if top_tools:
+        name, count = top_tools[0]
+        insights.append(Insight(
+            kind="did_you_know", icon="🔧", title="Favourite tool",
+            detail=f"You reach for `{name}` more than any other tool — {count:,} uses.",
+            rank=60,
+        ))
+
+    # 10) Favourite day-of-week
     weekday_counts: Counter[int] = Counter(f.started_weekday for f in features)
     if weekday_counts:
         top_day, top_n = weekday_counts.most_common(1)[0]
         insights.append(Insight(
             kind="did_you_know", icon="📅", title="Favourite day",
             detail=f"{_DAY_NAMES[top_day]} is your busiest day — {top_n} sessions.",
-            rank=70,
-        ))
-
-    if profile.prompt_specificity_avg > 0:
-        # Inverse of _SPECIFICITY_MAX_WORDS (200) in features.py
-        words = round(profile.prompt_specificity_avg * 200)
-        insights.append(Insight(
-            kind="did_you_know", icon="✍", title="Prompt length",
-            detail=f"Your average prompt is around {words} words long.",
-            rank=60,
-        ))
-
-    if profile.accept_and_go_ratio > 0:
-        ag_pct = round(100 * profile.accept_and_go_ratio)
-        insights.append(Insight(
-            kind="did_you_know", icon="✅", title="Trust signal",
-            detail=f"{ag_pct}% of your replies are short approvals like 'ok' or 'go ahead'.",
             rank=50,
-        ))
-
-    if profile.ai_agency_rate > 0:
-        insights.append(Insight(
-            kind="did_you_know", icon="🤖", title="AI workload",
-            detail=f"On average the AI fires {profile.ai_agency_rate:.1f} "
-                   f"tool calls per prompt you write.",
-            rank=55,
-        ))
-
-    if top_tools:
-        name, count = top_tools[0]
-        insights.append(Insight(
-            kind="did_you_know", icon="🔧", title="Favourite tool",
-            detail=f"You reach for `{name}` more than any other tool — {count:,} uses.",
-            rank=75,
         ))
 
     insights.sort(key=lambda i: -i.rank)
@@ -280,11 +382,41 @@ def compute_personality(
     *,
     longest_streak_days: int = 0,
     top_tools: list[tuple[str, int]] | None = None,
+    total_user_words: int = 0,
+    longest_prompt_words: int = 0,
+    longest_prompt_at: datetime | None = None,
+    marathon_session_minutes: float = 0.0,
+    marathon_session_at: datetime | None = None,
+    latest_prompt_local_hm: tuple[int, int] | None = None,
+    latest_prompt_at: datetime | None = None,
+    earliest_prompt_local_hm: tuple[int, int] | None = None,
+    earliest_prompt_at: datetime | None = None,
+    peak_day_count: int = 0,
+    peak_day_date: date | None = None,
+    weekend_session_pct: float = 0.0,
+    top_first_words: list[tuple[str, int]] | None = None,
 ) -> AIPersonality:
     """Compute the human-friendly personality bundle for the portal hero."""
     return AIPersonality(
         nickname=_nickname(profile, features),
         tagline=_tagline(profile),
         badges=_badges(profile, features, longest_streak_days=longest_streak_days),
-        did_you_know=_did_you_know(profile, features, top_tools=top_tools),
+        did_you_know=_did_you_know(
+            profile,
+            features,
+            top_tools=top_tools,
+            total_user_words=total_user_words,
+            longest_prompt_words=longest_prompt_words,
+            longest_prompt_at=longest_prompt_at,
+            marathon_session_minutes=marathon_session_minutes,
+            marathon_session_at=marathon_session_at,
+            latest_prompt_local_hm=latest_prompt_local_hm,
+            latest_prompt_at=latest_prompt_at,
+            earliest_prompt_local_hm=earliest_prompt_local_hm,
+            earliest_prompt_at=earliest_prompt_at,
+            peak_day_count=peak_day_count,
+            peak_day_date=peak_day_date,
+            weekend_session_pct=weekend_session_pct,
+            top_first_words=top_first_words,
+        ),
     )

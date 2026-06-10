@@ -90,6 +90,101 @@ def test_did_you_know_includes_total_sessions():
     assert "247" in text
 
 
+def test_did_you_know_includes_marathon_session():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        marathon_session_minutes=372.0,
+        marathon_session_at=datetime(2026, 3, 12, 14, 0, tzinfo=timezone.utc),
+    )
+    text = " ".join(d.detail for d in p.did_you_know)
+    assert "6h 12m" in text
+
+
+def test_did_you_know_includes_longest_prompt():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        longest_prompt_words=420,
+        longest_prompt_at=datetime(2026, 4, 5, 10, 0, tzinfo=timezone.utc),
+    )
+    text = " ".join(d.detail for d in p.did_you_know)
+    assert "420" in text
+
+
+def test_did_you_know_includes_night_owl_when_late_prompt():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        latest_prompt_local_hm=(2, 47),
+        latest_prompt_at=datetime(2026, 3, 5, 18, 47, tzinfo=timezone.utc),
+    )
+    titles = [d.title for d in p.did_you_know]
+    assert "Night-owl moment" in titles
+
+
+def test_did_you_know_omits_night_owl_when_no_late_prompt():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        latest_prompt_local_hm=(15, 30),
+        latest_prompt_at=datetime(2026, 3, 5, 7, 30, tzinfo=timezone.utc),
+    )
+    titles = [d.title for d in p.did_you_know]
+    assert "Night-owl moment" not in titles
+
+
+def test_did_you_know_includes_peak_day():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        peak_day_count=12,
+        peak_day_date=datetime(2026, 5, 15).date(),
+    )
+    text = " ".join(d.detail for d in p.did_you_know)
+    assert "12" in text
+
+
+def test_did_you_know_includes_favourite_opener():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        top_first_words=[("fix", 47), ("add", 30)],
+    )
+    text = " ".join(d.detail for d in p.did_you_know)
+    assert "fix" in text and "47" in text
+
+
+def test_did_you_know_includes_weekend_warrior_when_pct_high():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        weekend_session_pct=0.35,
+    )
+    titles = [d.title for d in p.did_you_know]
+    assert "Weekend warrior" in titles
+
+
+def test_did_you_know_omits_weekend_warrior_when_pct_low():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        weekend_session_pct=0.05,
+    )
+    titles = [d.title for d in p.did_you_know]
+    assert "Weekend warrior" not in titles
+
+
+def test_did_you_know_includes_words_typed_with_total_user_words():
+    p = compute_personality(
+        _profile(),
+        [_feat()],
+        total_user_words=84_392,
+    )
+    text = " ".join(d.detail for d in p.did_you_know)
+    assert "84,392" in text
+
+
 def test_nickname_includes_archetype_word():
     # High planning + high control → "Architect"-ish nickname
     p = compute_personality(
