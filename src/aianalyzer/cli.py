@@ -17,6 +17,7 @@ from aianalyzer.collectors.vscode_copilot import VsCodeCopilotCollector
 from aianalyzer.discovery import (
     discover_copilot_cli_sessions,
     discover_vscode_copilot_sessions,
+    discover_vscode_copilot_store_sessions,
 )
 from aianalyzer.features import (
     SessionFeatures,
@@ -60,6 +61,7 @@ def scan(
     # pass --home, so they still get everything.
     if home is None:
         discovered += list(discover_vscode_copilot_sessions())
+        discovered += list(discover_vscode_copilot_store_sessions())
 
     store = FeatureStore(cache_path)
     by_client: dict[str, int] = {}

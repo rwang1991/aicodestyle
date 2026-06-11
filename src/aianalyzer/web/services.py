@@ -15,6 +15,7 @@ from aianalyzer.discovery import (
     DiscoveredSession,
     discover_copilot_cli_sessions,
     discover_vscode_copilot_sessions,
+    discover_vscode_copilot_store_sessions,
 )
 from aianalyzer.features import UserProfile, aggregate_user_profile, extract_session_features
 from aianalyzer.insights import compute_personality
@@ -56,6 +57,7 @@ def discover_all_sessions() -> Iterable[DiscoveredSession]:
     """
     yield from discover_copilot_cli_sessions()
     yield from discover_vscode_copilot_sessions()
+    yield from discover_vscode_copilot_store_sessions()
 
 
 # Map a client name to the collector used to parse one of its sessions.

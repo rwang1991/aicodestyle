@@ -19,7 +19,11 @@ from aianalyzer.features import SessionFeatures
 # v11: Phase H — billed token accounting (actual_*, premium_requests, nano_aiu).
 # v12: Phase H bug fix — input_tokens semantics changed from "aggregate (incl.
 #      cache pools)" to "uncached only", so cached features from v11 are wrong.
-SCHEMA_VERSION = 12
+# v13: VS Code Copilot Chat SQLite session store added (globalStorage/
+#      github.copilot-chat/session-store.db). Existing caches still valid for
+#      JSON-sourced sessions, but a bump forces a clean rebuild that picks up
+#      the new ones.
+SCHEMA_VERSION = 13
 
 
 class FeatureStore:

@@ -184,6 +184,14 @@ class VsCodeCopilotCollector:
     client = "vscode-copilot"
 
     def parse(self, discovered: DiscoveredSession) -> NormalizedSession:
+        # Newer Copilot Chat versions persist sessions to a single SQLite store
+        # (globalStorage/github.copilot-chat/session-store.db) instead of
+        # per-workspace JSON files. Dispatch on the discovered file extension
+        # rather than the client name so the existing pipeline (DiscoveredSession
+        # -> Collector -> NormalizedSession) doesn't need a separate registration.
+        if discovered.events_path.suffix.lower() == ".db":
+            return self._parse_from_db(discovered)
+
         try:
             with discovered.events_path.open("r", encoding="utf-8") as fh:
                 data = json.load(fh)
@@ -262,3 +270,103 @@ class VsCodeCopilotCollector:
             ended_at=_EPOCH,
             raw_mtime=d.mtime,
         )
+
+    def _parse_from_db(self, discovered: DiscoveredSession) -> NormalizedSession:
+        """Parse one VS Code Copilot Chat session from the SQLite session-store.
+
+        The session_id on ``discovered`` is ``db:<row-id>``; the actual primary
+        key in the DB drops that prefix. Reads sessions + turns read-only so we
+        coexist with a running VS Code window. Returns an empty session on any
+        SQLite error rather than raising — discovery may yield a row that races
+        with a concurrent delete.
+        """
+        import sqlite3
+
+        from aianalyzer.discovery import _open_sqlite_readonly  # local import to keep top-level clean
+
+        raw_id = discovered.session_id.split(":", 1)[1] if discovered.session_id.startswith("db:") else discovered.session_id
+        try:
+            con = _open_sqlite_readonly(discovered.events_path)
+        except sqlite3.Error:
+            return self._empty(discovered)
+        try:
+            try:
+                meta = con.execute(
+                    "SELECT cwd, created_at, updated_at FROM sessions WHERE id = ?",
+                    (raw_id,),
+                ).fetchone()
+            except sqlite3.Error:
+                return self._empty(discovered)
+            if not meta:
+                return self._empty(discovered)
+            cwd, created_at, updated_at = meta
+            try:
+                turn_rows = con.execute(
+                    "SELECT turn_index, user_message, assistant_response, timestamp "
+                    "FROM turns WHERE session_id = ? ORDER BY turn_index",
+                    (raw_id,),
+                ).fetchall()
+            except sqlite3.Error:
+                turn_rows = []
+        finally:
+            con.close()
+
+        started_at = _ts_from_iso(created_at) or _EPOCH
+        ended_at = _ts_from_iso(updated_at) or started_at
+
+        turns: list[Turn] = []
+        for row in turn_rows:
+            idx, user_msg, asst_msg, ts_iso = row
+            ts = _ts_from_iso(ts_iso) or started_at
+            user: Optional[UserMessage] = None
+            if isinstance(user_msg, str) and user_msg:
+                user = UserMessage(content=redact(user_msg), ts=ts)
+            assistant: Optional[AssistantMessage] = None
+            if isinstance(asst_msg, str) and asst_msg:
+                assistant = AssistantMessage(
+                    turn_id=str(idx),
+                    content=redact(asst_msg),
+                    # The SQLite store doesn't record the model per turn — leave
+                    # blank rather than guessing. Tool-call extraction also isn't
+                    # possible from prose-only turn rows; both signals are simply
+                    # not available for this source.
+                    model="",
+                    reasoning_effort=None,
+                    ts=ts,
+                )
+            try:
+                turn_index = int(idx) if idx is not None else len(turns)
+            except (TypeError, ValueError):
+                turn_index = len(turns)
+            turns.append(
+                Turn(
+                    index=turn_index,
+                    user=user,
+                    assistant=assistant,
+                    tool_calls=[],
+                    aborted=False,
+                )
+            )
+
+        return NormalizedSession(
+            client="vscode-copilot",
+            session_id=discovered.session_id,
+            started_at=started_at,
+            ended_at=ended_at,
+            cwd=cwd if isinstance(cwd, str) else None,
+            models_used=[],
+            turns=turns,
+            todos=[],
+            raw_mtime=discovered.mtime,
+        )
+
+
+def _ts_from_iso(value: object) -> Optional[datetime]:
+    """Parse ``YYYY-MM-DDTHH:MM:SS.sssZ`` to an aware datetime, or None."""
+    if not isinstance(value, str) or not value:
+        return None
+    s = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        return None
