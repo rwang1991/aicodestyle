@@ -51,6 +51,51 @@ def test_empty_profile_returns_empty_tips_and_low_score():
     assert rep.band in {"Apprentice", "Practitioner", "Operator", "Conductor"}
 
 
+def test_score_perfect_user():
+    p = _profile_with(
+        total_sessions=50,
+        avg_turns_per_session=8.0,
+        median_prompt_words=70,
+        output_to_input_ratio=1.5,
+        priced_token_share=0.95,
+    )
+    fs = _features_with_agency([0.65] * 50)
+    rep = compute_coach_report(p, fs)
+    assert rep.score >= 85
+    assert rep.band == "Conductor"
+    assert set(rep.sub_scores.keys()) == {"cost", "handson", "prompt", "shape"}
+
+
+def test_score_apprentice():
+    p = _profile_with(
+        total_sessions=50,
+        avg_turns_per_session=80.0,
+        median_prompt_words=3,
+        output_to_input_ratio=6.0,
+        priced_token_share=0.20,
+    )
+    fs = _features_with_agency([0.99] * 50)
+    rep = compute_coach_report(p, fs)
+    assert rep.score <= 40
+    assert rep.band == "Apprentice"
+
+
+def test_score_sub_scores_each_capped_at_25():
+    p = _profile_with(total_sessions=50, output_to_input_ratio=1.5, priced_token_share=1.0)
+    fs = _features_with_agency([0.65] * 50)
+    rep = compute_coach_report(p, fs)
+    for v in rep.sub_scores.values():
+        assert 0 <= v <= 25
+
+
+def test_score_bands_exhaustive():
+    from aianalyzer.coaching import _band_for_score
+    assert _band_for_score(10) == "Apprentice"
+    assert _band_for_score(50) == "Practitioner"
+    assert _band_for_score(75) == "Operator"
+    assert _band_for_score(95) == "Conductor"
+
+
 def _profile_with(**overrides) -> ExtendedProfile:
     p = _empty_profile()
     for k, v in overrides.items():

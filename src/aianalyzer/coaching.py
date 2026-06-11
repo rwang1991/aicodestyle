@@ -555,6 +555,60 @@ def compute_coach_report(
     return CoachReport(score=score, band=band, sub_scores=subs, tips=selected)
 
 
+def _band_for_score(s: int) -> str:
+    if s <= 40:
+        return "Apprentice"
+    if s <= 65:
+        return "Practitioner"
+    if s <= 85:
+        return "Operator"
+    return "Conductor"
+
+
+def _linear_fall_off(value: float, lo: float, hi: float, dropoff: float) -> float:
+    """Returns 1.0 inside [lo, hi]; linear fall to 0 over `dropoff` distance outside."""
+    if lo <= value <= hi:
+        return 1.0
+    distance = lo - value if value < lo else value - hi
+    return max(0.0, 1.0 - (distance / dropoff))
+
+
+def _score_cost(p) -> int:
+    if p.output_to_input_ratio == 0:
+        return 0
+    ratio_fit = _linear_fall_off(p.output_to_input_ratio, 0.8, 2.5, 4.0)
+    priced_fit = min(1.0, p.priced_token_share / 0.85) if p.priced_token_share else 0.5
+    return int(round(25 * (0.6 * ratio_fit + 0.4 * priced_fit)))
+
+
+def _score_handson(features) -> int:
+    share = _hands_on_share(features)
+    if share is None:
+        return 12
+    fit = _linear_fall_off(share, 0.20, 0.50, 0.35)
+    return int(round(25 * fit))
+
+
+def _score_prompt(p) -> int:
+    if p.median_prompt_words == 0:
+        return 0
+    fit = _linear_fall_off(p.median_prompt_words, 30, 160, 80)
+    return int(round(25 * fit))
+
+
+def _score_session_shape(p) -> int:
+    if p.avg_turns_per_session == 0:
+        return 0
+    fit = _linear_fall_off(p.avg_turns_per_session, 4, 20, 25)
+    return int(round(25 * fit))
+
+
 def _efficiency_score(profile, features):
-    """Placeholder until Task 8 lands the real composite."""
-    return 0, "Apprentice", {}
+    subs = {
+        "cost": _score_cost(profile),
+        "handson": _score_handson(features),
+        "prompt": _score_prompt(profile),
+        "shape": _score_session_shape(profile),
+    }
+    total = sum(subs.values())
+    return total, _band_for_score(total), subs
