@@ -1007,152 +1007,93 @@
     for (const btn of buttons) btn.addEventListener("click", run);
   }
 
-  async function wireExportPdf() {
-    const btn = $("#export-pdf-btn");
+  async function wireExportHtml() {
+    const btn = $("#export-html-btn");
     if (!btn) return;
-    if (typeof window.html2pdf !== "function") {
-      btn.disabled = true;
-      btn.title = "PDF export library failed to load.";
-      return;
-    }
-
-    // Capture-time layout overrides. We mutate inline styles directly
-    // (instead of relying on a body class) because html2canvas clones
-    // the document into a hidden iframe and dynamic class-toggled CSS
-    // is sometimes missed by the cascade in that clone. Each entry
-    // is restored after capture.
-    const PDF_WIDTH = 780;
-    function pinLayout() {
-      const restore = [];
-      const setStyle = (el, prop, value) => {
-        if (!el) return;
-        restore.push({ el, prop, prev: el.style[prop] });
-        el.style[prop] = value;
-      };
-      const main = document.getElementById("app");
-      setStyle(main, "width", PDF_WIDTH + "px");
-      setStyle(main, "maxWidth", PDF_WIDTH + "px");
-      setStyle(main, "padding", "14px");
-      // Pin main to the viewport's left edge so html2canvas captures at (0,0)
-      // rather than the centered offset (which leaves content clipped).
-      setStyle(main, "margin", "0");
-      setStyle(main, "marginLeft", "0");
-      document.querySelectorAll(".hero-card, .shape-body, .axes-explainer-body, .charts, .tables, .behavior-cols")
-        .forEach((el) => setStyle(el, "gridTemplateColumns", "1fr"));
-      document.querySelectorAll(".chart-wide")
-        .forEach((el) => setStyle(el, "gridColumn", "auto"));
-      document.querySelectorAll(".charts canvas")
-        .forEach((el) => setStyle(el, "maxHeight", "240px"));
-      // Force the <details> blocks open so axes-explainer paragraphs render
-      const opened = [];
-      document.querySelectorAll("details").forEach((el) => {
-        if (!el.open) { opened.push(el); el.open = true; }
-      });
-      // Hide the topbar + inline narrate button
-      setStyle(document.querySelector(".topbar"), "display", "none");
-      setStyle(document.getElementById("narrate-btn-inline"), "display", "none");
-      // CSS Grid won't shrink children below their min-content. Chart cards
-      // sit inside .charts with intrinsically wide canvases from a previous
-      // render, so columns refuse to shrink. Force min-width: 0 + clear
-      // canvas size so grid cells collapse to the pinned 780-wide row, THEN
-      // resize() the chart below.
-      document.querySelectorAll(".charts > .card, .tables > .card").forEach((el) => {
-        setStyle(el, "minWidth", "0");
-      });
-      document.querySelectorAll(".charts canvas, .hero-card canvas").forEach((cnv) => {
-        cnv.style.width = "";
-        cnv.style.height = "";
-        cnv.removeAttribute("width");
-        cnv.removeAttribute("height");
-      });
-      // Force a synchronous layout reflow so .card widths re-compute.
-      void document.body.offsetHeight;
-      return { restore, opened };
-    }
-    function unpinLayout({ restore, opened }) {
-      for (const { el, prop, prev } of restore) {
-        el.style[prop] = prev || "";
-      }
-      for (const el of opened) el.open = false;
-    }
 
     btn.addEventListener("click", async () => {
       const main = document.getElementById("app");
       if (!main) return;
       const original = btn.textContent;
       btn.disabled = true;
-      btn.textContent = "Preparing PDF…";
+      btn.textContent = "Preparing HTML…";
 
-      const pinned = pinLayout();
-
-      const stampNode = document.createElement("div");
-      stampNode.className = "pdf-header";
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, "0");
-      const ymd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-      const hms = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      stampNode.textContent = `AIAnalyzer report · generated ${ymd} ${hms}`;
-      main.insertBefore(stampNode, main.firstChild);
-
-      // Two RAFs so Chart.js resize observers can react to the new column width.
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      // Force every Chart.js instance to re-render at the pinned container width.
-      // Chart.js's responsive ResizeObserver fires asynchronously and sometimes
-      // misses our synchronous style change, so we call resize() with explicit
-      // dimensions read from the actual parent .card box after pin.
       try {
+        // 1) Freeze every Chart.js canvas to a PNG so the offline file
+        //    doesn't need Chart.js or live data to render.
+        const canvasReplacements = [];
         Object.values(charts).forEach((c) => {
-          if (!c || typeof c.resize !== "function") return;
-          const cnv = c.canvas;
-          const parent = cnv && cnv.parentNode;
-          if (parent) {
-            cnv.style.width = "";
-            cnv.style.height = "";
-            cnv.removeAttribute("width");
-            cnv.removeAttribute("height");
-            const targetW = parent.clientWidth;
-            const targetH = Math.min(240, Math.round(targetW * 0.45));
-            c.resize(targetW, targetH);
-          } else {
-            c.resize();
-          }
+          if (!c || !c.canvas) return;
+          try {
+            const png = c.canvas.toDataURL("image/png");
+            const img = document.createElement("img");
+            img.src = png;
+            img.alt = c.canvas.id || "chart";
+            img.style.maxWidth = "100%";
+            img.style.height = "auto";
+            canvasReplacements.push({ canvas: c.canvas, img, parent: c.canvas.parentNode });
+            c.canvas.parentNode.insertBefore(img, c.canvas);
+            c.canvas.style.display = "none";
+          } catch (_) { /* tainted canvas — skip */ }
         });
-      } catch (_) {}
-      // And give Chart.js a moment to actually redraw after resize.
-      await new Promise((r) => setTimeout(r, 250));
 
-      try {
-        btn.textContent = "Rendering PDF…";
-        const mainRect = main.getBoundingClientRect();
-        await window.html2pdf()
-          .set({
-            margin: [12, 10, 14, 10],
-            filename: `aianalyzer-report-${ymd}.pdf`,
-            image: { type: "jpeg", quality: 0.95 },
-            html2canvas: {
-              scale: 2,
-              useCORS: true,
-              backgroundColor: "#0e1117",
-              width: PDF_WIDTH,
-              windowWidth: PDF_WIDTH,
-              // Force capture from the element's actual left/top so the canvas
-              // covers main itself (not a shifted slice of the viewport).
-              x: mainRect.left + window.scrollX,
-              y: mainRect.top + window.scrollY,
-              scrollX: 0,
-              scrollY: 0,
-            },
-            jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
-            pagebreak: { mode: ["css", "legacy"] },
-          })
-          .from(main)
-          .save();
-        toast("PDF downloaded.", "info", 3500);
+        // 2) Collect every stylesheet (inline + linked /static/styles.css)
+        //    into a single <style> block.
+        let cssBlocks = [];
+        for (const sheet of document.styleSheets) {
+          try {
+            for (const rule of sheet.cssRules) cssBlocks.push(rule.cssText);
+          } catch (_) { /* cross-origin sheet — skip */ }
+        }
+        const inlineStyle = `<style>${cssBlocks.join("\n")}</style>`;
+
+        // 3) Topbar action buttons make no sense offline — strip them.
+        const topbar = document.querySelector(".topbar .actions");
+        const topbarPrev = topbar ? topbar.style.display : null;
+        if (topbar) topbar.style.display = "none";
+
+        // 4) Build the standalone document.
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        const ymd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        const hms = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const stamp = `AIAnalyzer report · generated ${ymd} ${hms}`;
+
+        const fullHtml =
+          "<!doctype html>\n" +
+          "<html lang=\"en\"><head><meta charset=\"utf-8\">" +
+          `<title>AIAnalyzer report · ${ymd}</title>` +
+          inlineStyle +
+          "<style>body{background:#0e1117;color:#e5e7eb;margin:0;}" +
+          ".report-stamp{font:12px/1.4 system-ui;color:#94a3b8;padding:14px 24px;border-bottom:1px solid #1f2937;}" +
+          ".topbar{display:none !important;}</style>" +
+          "</head><body>" +
+          `<div class="report-stamp">${stamp}</div>` +
+          `<main id="app" class="${main.className || ""}">${main.innerHTML}</main>` +
+          "</body></html>";
+
+        // 5) Restore live DOM (remove our snapshot mutations).
+        for (const r of canvasReplacements) {
+          r.img.remove();
+          r.canvas.style.display = "";
+        }
+        if (topbar) topbar.style.display = topbarPrev || "";
+
+        // 6) Trigger download.
+        const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `aianalyzer-report-${ymd}.html`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        toast("HTML report downloaded.", "info", 3500);
       } catch (e) {
-        toast(`PDF export failed: ${e.message || e}`);
+        toast(`HTML export failed: ${e.message || e}`);
       } finally {
-        stampNode.remove();
-        unpinLayout(pinned);
         btn.disabled = false;
         btn.textContent = original;
       }
@@ -1184,7 +1125,7 @@
   document.addEventListener("DOMContentLoaded", async () => {
     wireScan();
     wireNarrative();
-    wireExportPdf();
+    wireExportHtml();
     await load();
   });
 })();
