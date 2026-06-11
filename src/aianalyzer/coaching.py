@@ -45,6 +45,15 @@ class CoachReport:
     tips: list[CoachTip] = field(default_factory=list)
 
 
+
+def _total_tokens(p) -> int:
+    """Prefer billed total; fall back to tiktoken estimate."""
+    return p.actual_total_tokens if getattr(p, "actual_total_tokens", 0) > 0 else p.est_total_tokens
+
+
+def _cost_usd(p) -> float:
+    return p.actual_cost_usd if getattr(p, "actual_cost_usd", 0) > 0 else (p.est_cost_usd or 0.0)
+
 # --- Category A: cost & token efficiency -----------------------------------
 
 
@@ -133,7 +142,7 @@ def _rule_a4_expensive_session(p, features):
 
 
 def _rule_a5_unpriced_share(p, features):
-    if p.est_total_tokens < 100_000 or p.priced_token_share == 0:
+    if _total_tokens(p) < 100_000 or p.priced_token_share == 0:
         return None
     if p.priced_token_share >= 0.85:
         return None
@@ -611,3 +620,4 @@ def _efficiency_score(profile, features):
     }
     total = sum(subs.values())
     return total, _band_for_score(total), subs
+

@@ -508,3 +508,13 @@ def test_aggregator_handles_empty():
     rep = compute_coach_report(p, [])
     assert rep.tips == []
     assert 0 <= rep.score <= 100
+def test_rule_a5_uses_actual_total_tokens_when_available():
+    from aianalyzer.coaching import _rule_a5_unpriced_share
+    p = _profile_with(
+        priced_token_share=0.70,
+        est_total_tokens=1_000,
+        actual_total_tokens=500_000,
+    )
+    tip = _rule_a5_unpriced_share(p, [])
+    assert tip is not None
+
