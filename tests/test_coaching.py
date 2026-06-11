@@ -167,3 +167,45 @@ def test_rule_a6_skips_when_balanced_use():
         avg_turns_per_session=12.0,
     )
     assert _rule_a6_premium_for_quick(p, []) is None
+
+
+def test_rule_b1_short_prompts():
+    from aianalyzer.coaching import _rule_b1_short_prompts
+    p = _profile_with(median_prompt_words=6, total_sessions=15)
+    tip = _rule_b1_short_prompts(p, [])
+    assert tip is not None
+    assert tip.severity == Severity.TIP
+
+
+def test_rule_b1_skips_at_threshold():
+    from aianalyzer.coaching import _rule_b1_short_prompts
+    p = _profile_with(median_prompt_words=10, total_sessions=15)
+    assert _rule_b1_short_prompts(p, []) is None
+
+
+def test_rule_b2_overspecify_then_iterate():
+    from aianalyzer.coaching import _rule_b2_overspecify
+    p = _profile_with(median_prompt_words=300, avg_turns_per_session=25, total_sessions=20)
+    tip = _rule_b2_overspecify(p, [])
+    assert tip is not None
+    assert tip.severity == Severity.TIP
+
+
+def test_rule_b2_skips_when_short_sessions():
+    from aianalyzer.coaching import _rule_b2_overspecify
+    p = _profile_with(median_prompt_words=300, avg_turns_per_session=5, total_sessions=20)
+    assert _rule_b2_overspecify(p, []) is None
+
+
+def test_rule_b3_sweet_spot_win():
+    from aianalyzer.coaching import _rule_b3_sweet_spot
+    p = _profile_with(median_prompt_words=70, total_sessions=20)
+    tip = _rule_b3_sweet_spot(p, [])
+    assert tip is not None
+    assert tip.severity == Severity.WIN
+
+
+def test_rule_b3_skips_outside_range():
+    from aianalyzer.coaching import _rule_b3_sweet_spot
+    p = _profile_with(median_prompt_words=5, total_sessions=20)
+    assert _rule_b3_sweet_spot(p, []) is None

@@ -178,6 +178,70 @@ def _rule_a6_premium_for_quick(p, features):
     )
 
 
+# --- Category B: prompt quality -------------------------------------------
+
+
+def _rule_b1_short_prompts(p, features):
+    if p.total_sessions < 10 or p.median_prompt_words >= 10:
+        return None
+    return CoachTip(
+        rule_id="B1",
+        severity=Severity.TIP,
+        category="prompt",
+        headline="Short prompts get short answers",
+        body=(
+            f"Your median prompt is {p.median_prompt_words:.0f} words. "
+            "Adding 2–3 lines of context (goal, constraints, format) typically "
+            "cuts your iteration count in half."
+        ),
+        impact_estimate=0.6,
+        evidence={"median_prompt_words": p.median_prompt_words},
+    )
+
+
+def _rule_b2_overspecify(p, features):
+    if p.median_prompt_words <= 250:
+        return None
+    if p.avg_turns_per_session <= 20:
+        return None
+    return CoachTip(
+        rule_id="B2",
+        severity=Severity.TIP,
+        category="prompt",
+        headline="You over-specify, then iterate anyway",
+        body=(
+            f"Median prompt = {p.median_prompt_words:.0f} words; average "
+            f"{p.avg_turns_per_session:.0f} turns per session. Try a compact spec "
+            "(<150 words) + a single review pass — faster and usually as accurate."
+        ),
+        impact_estimate=0.4,
+        evidence={
+            "median_prompt_words": p.median_prompt_words,
+            "avg_turns": p.avg_turns_per_session,
+        },
+    )
+
+
+def _rule_b3_sweet_spot(p, features):
+    if p.total_sessions < 15:
+        return None
+    mw = p.median_prompt_words
+    if not (40 <= mw <= 140):
+        return None
+    return CoachTip(
+        rule_id="B3",
+        severity=Severity.WIN,
+        category="prompt",
+        headline="Prompt length sits in the sweet spot",
+        body=(
+            f"Median prompt = {mw:.0f} words. That's enough context to ground the "
+            "model without burying it. Keep doing what you're doing."
+        ),
+        impact_estimate=0.1,
+        evidence={"median_prompt_words": mw},
+    )
+
+
 def compute_coach_report(
     profile: ExtendedProfile,
     features: Iterable[SessionFeatures],
