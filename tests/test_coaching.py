@@ -9,6 +9,7 @@ from aianalyzer.coaching import (
     Severity,
     compute_coach_report,
 )
+from aianalyzer.features import SessionFeatures
 from aianalyzer.stats import ExtendedProfile
 
 
@@ -55,6 +56,18 @@ def _profile_with(**overrides) -> ExtendedProfile:
     for k, v in overrides.items():
         setattr(p, k, v)
     return p
+
+
+def _features_with_agency(values: list[float]) -> list[SessionFeatures]:
+    return [
+        SessionFeatures(
+            session_id=f"s{i}",
+            client="copilot-cli",
+            started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            ai_agency_rate=v,
+        )
+        for i, v in enumerate(values)
+    ]
 
 
 def _tip_with_id(rep_or_tips, rule_id):
@@ -209,3 +222,44 @@ def test_rule_b3_skips_outside_range():
     from aianalyzer.coaching import _rule_b3_sweet_spot
     p = _profile_with(median_prompt_words=5, total_sessions=20)
     assert _rule_b3_sweet_spot(p, []) is None
+
+
+def test_rule_c1_hands_off_extreme():
+    from aianalyzer.coaching import _rule_c1_hands_off
+    p = _profile_with(total_sessions=30)
+    fs = _features_with_agency([0.95] * 30)  # 5% hands-on
+    tip = _rule_c1_hands_off(p, fs)
+    assert tip is not None
+    assert tip.severity == Severity.HEADS_UP
+
+
+def test_rule_c1_skips_when_balanced():
+    from aianalyzer.coaching import _rule_c1_hands_off
+    p = _profile_with(total_sessions=30)
+    fs = _features_with_agency([0.7] * 30)  # 30% hands-on
+    assert _rule_c1_hands_off(p, fs) is None
+
+
+def test_rule_c2_micromanage():
+    from aianalyzer.coaching import _rule_c2_micromanage
+    p = _profile_with(total_sessions=25)
+    fs = _features_with_agency([0.30] * 25)  # 70% hands-on
+    tip = _rule_c2_micromanage(p, fs)
+    assert tip is not None
+    assert tip.severity == Severity.TIP
+
+
+def test_rule_c2_skips_when_balanced():
+    from aianalyzer.coaching import _rule_c2_micromanage
+    p = _profile_with(total_sessions=25)
+    fs = _features_with_agency([0.65] * 25)  # 35% hands-on
+    assert _rule_c2_micromanage(p, fs) is None
+
+
+def test_rule_c3_balance_win():
+    from aianalyzer.coaching import _rule_c3_balance_win
+    p = _profile_with(total_sessions=25)
+    fs = _features_with_agency([0.7] * 25)  # 30% hands-on
+    tip = _rule_c3_balance_win(p, fs)
+    assert tip is not None
+    assert tip.severity == Severity.WIN

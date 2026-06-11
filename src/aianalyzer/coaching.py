@@ -242,6 +242,79 @@ def _rule_b3_sweet_spot(p, features):
     )
 
 
+# --- Category C: hands-on balance -----------------------------------------
+
+
+def _hands_on_share(features) -> float | None:
+    fs = [f for f in features if f.turn_count > 0 or f.ai_agency_rate]
+    if not fs:
+        # Some features have no turns recorded; still average if we have data.
+        fs = list(features)
+    if not fs:
+        return None
+    return 1.0 - (sum(f.ai_agency_rate for f in fs) / len(fs))
+
+
+def _rule_c1_hands_off(p, features):
+    if p.total_sessions < 20:
+        return None
+    share = _hands_on_share(features)
+    if share is None or share >= 0.15:
+        return None
+    return CoachTip(
+        rule_id="C1",
+        severity=Severity.HEADS_UP,
+        category="balance",
+        headline="You're firmly hands-off",
+        body=(
+            f"Your hands-on share is {share*100:.0f}%. AI is driving almost everything. "
+            "Skim the diffs before applying — you'll catch regressions AND learn faster."
+        ),
+        impact_estimate=0.7,
+        evidence={"hands_on_share": share},
+    )
+
+
+def _rule_c2_micromanage(p, features):
+    if p.total_sessions < 15:
+        return None
+    share = _hands_on_share(features)
+    if share is None or share <= 0.60:
+        return None
+    return CoachTip(
+        rule_id="C2",
+        severity=Severity.TIP,
+        category="balance",
+        headline="You're micro-managing",
+        body=(
+            f"Hands-on share = {share*100:.0f}%. You're doing the work AI could do. "
+            "Try describing a scoped subtask end-to-end and letting AI complete it before you review."
+        ),
+        impact_estimate=0.5,
+        evidence={"hands_on_share": share},
+    )
+
+
+def _rule_c3_balance_win(p, features):
+    if p.total_sessions < 20:
+        return None
+    share = _hands_on_share(features)
+    if share is None or not (0.20 <= share <= 0.50):
+        return None
+    return CoachTip(
+        rule_id="C3",
+        severity=Severity.WIN,
+        category="balance",
+        headline="Healthy hands-on / hands-off balance",
+        body=(
+            f"Hands-on share = {share*100:.0f}%. You delegate clearly but stay in the loop. "
+            "This is the sweet spot for both learning and throughput."
+        ),
+        impact_estimate=0.1,
+        evidence={"hands_on_share": share},
+    )
+
+
 def compute_coach_report(
     profile: ExtendedProfile,
     features: Iterable[SessionFeatures],
