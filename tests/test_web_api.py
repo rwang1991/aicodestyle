@@ -239,3 +239,34 @@ def test_narrative_job_reports_failure(monkeypatch):
         time.sleep(0.05)
     assert j is not None and j["status"] == "failed", j
     assert "copilot exited" in j["error"]
+
+
+def test_profile_includes_coach_block(tmp_path, monkeypatch):
+    """Coach block exposes score, band, sub_scores, tips."""
+    monkeypatch.setenv("AIANALYZER_CACHE_DIR", str(tmp_path))
+    from aianalyzer.web import services
+    monkeypatch.setattr(services, "discover_all_sessions", lambda: [])
+
+    client = TestClient(create_app())
+
+    r = client.post("/api/scan", json={})
+    assert r.status_code == 202
+    job_id = r.json()["job_id"]
+
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        j = client.get(f"/api/jobs/{job_id}").json()
+        if j["status"] in ("done", "failed"):
+            break
+        time.sleep(0.05)
+    assert j["status"] == "done"
+
+    p = client.get("/api/profile").json()
+    assert "coach" in p
+    coach = p["coach"]
+    assert "score" in coach and 0 <= coach["score"] <= 100
+    assert coach["band"] in {"Apprentice", "Practitioner", "Operator", "Conductor"}
+    assert isinstance(coach["sub_scores"], dict)
+    assert isinstance(coach["tips"], list)
+    # Empty cache → no tips emitted
+    assert coach["tips"] == []

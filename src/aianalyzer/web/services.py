@@ -7,6 +7,7 @@ from typing import Any, Iterable
 
 from aianalyzer.classifier.rules import classify
 from aianalyzer.classifier.weights import load_weights
+from aianalyzer.coaching import compute_coach_report
 from aianalyzer.collectors.base import Collector
 from aianalyzer.collectors.copilot_cli import CopilotCliCollector
 from aianalyzer.collectors.vscode_copilot import VsCodeCopilotCollector
@@ -193,6 +194,26 @@ def _build_behavior_block(profile: UserProfile) -> dict[str, Any]:
     }
 
 
+def _serialize_coach_report(report) -> dict:
+    return {
+        "score": report.score,
+        "band": report.band,
+        "sub_scores": dict(report.sub_scores),
+        "tips": [
+            {
+                "rule_id": t.rule_id,
+                "severity": t.severity.value,
+                "category": t.category,
+                "headline": t.headline,
+                "body": t.body,
+                "impact_estimate": t.impact_estimate,
+                "evidence": t.evidence,
+            }
+            for t in report.tips
+        ],
+    }
+
+
 def run_scan(progress_cb=None) -> dict[str, Any]:
     """Discover -> normalize -> extract -> cache. Returns counts and per-client breakdown."""
     store = FeatureStore(_cache_path())
@@ -299,6 +320,7 @@ def load_profile_payload() -> dict[str, Any]:
             "sessions_for_80pct_tokens": ext.sessions_for_80pct_tokens,
             "top_cost_sessions": ext.top_cost_sessions,
         },
+        "coach": _serialize_coach_report(compute_coach_report(ext, features)),
         "activity_per_day_last_90": ext.activity_per_day_last_90,
         "by_client": ext.by_client,
         "first_session_at": ext.first_session_at.isoformat() if ext.first_session_at else None,
