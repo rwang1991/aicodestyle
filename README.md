@@ -7,9 +7,33 @@ Everything runs on your machine. No accounts. No telemetry. No data ever leaves 
 
 ---
 
+## See it in action
+
+![AICodeStyle hero — archetype, personality, behavior radar](docs/screenshots/01-hero.png)
+
+<details>
+<summary><b>More screenshots</b> (AI Coach, Token Economy, Behavior Radar, KPIs)</summary>
+
+### Your AI Coach — concrete, prompt-mined tips
+![AI Coach grade card with tips](docs/screenshots/02-coach.png)
+
+### Token Economy — real billed numbers from `session.shutdown`
+![Token Economy with billed totals and top-cost sessions](docs/screenshots/03-token-economy.png)
+
+### Behavior Shape — six independent traits, each with the raw value and formula
+![Behavior radar with six traits and detail panel](docs/screenshots/04-behavior-radar.png)
+
+### KPI grid — every headline number on one screen
+![KPI grid: sessions, turns, engaged time, prompt length, acceptance rate](docs/screenshots/05-kpi-grid.png)
+
+</details>
+
+---
+
 ## Table of Contents
 
 - [Why](#why)
+- [See it in action](#see-it-in-action)
 - [What you get](#what-you-get)
 - [Supported AI tools](#supported-ai-tools)
 - [Quick start (Windows, no Python required)](#quick-start-windows-no-python-required)
