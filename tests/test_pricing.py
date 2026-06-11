@@ -43,3 +43,17 @@ def test_is_priced_true_for_known_model():
 
 def test_is_priced_false_for_unknown_model():
     assert is_priced("custom-private-model") is False
+def test_estimate_cost_usd_v2_cache_read_discounts():
+    from aianalyzer.pricing import estimate_cost_usd_v2
+
+    # 1M cache-read tokens only: input list price times provider discount.
+    assert estimate_cost_usd_v2("claude-opus", 0, 0, cache_read_tokens=1_000_000) == pytest.approx(1.5)
+    assert estimate_cost_usd_v2("gpt-5", 0, 0, cache_read_tokens=1_000_000) == pytest.approx(2.5)
+    assert estimate_cost_usd_v2("gemini", 0, 0, cache_read_tokens=1_000_000) == pytest.approx(0.0875)
+
+
+def test_estimate_cost_usd_v2_charges_cache_write_at_input_rate():
+    from aianalyzer.pricing import estimate_cost_usd_v2
+
+    assert estimate_cost_usd_v2("claude-haiku-4.5", 0, 0, cache_write_tokens=1_000_000) == pytest.approx(1.0)
+

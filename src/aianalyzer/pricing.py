@@ -89,3 +89,38 @@ def estimate_cost_usd(
         input_tokens / 1_000_000 * p.input_per_1m
         + output_tokens / 1_000_000 * p.output_per_1m
     )
+def _cache_read_discount(model: str) -> float:
+    m = _normalize(model)
+    if "claude" in m:
+        return 0.10
+    if "gpt" in m or "codex" in m:
+        return 0.50
+    if "gemini" in m:
+        return 0.25
+    return 0.25
+
+
+def estimate_cost_usd_v2(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> Optional[float]:
+    """Cost with cache-aware pricing.
+
+    `input_tokens` here is UNCACHED input (full rate).
+    `cache_write_tokens` is charged at the input rate (provider stores it).
+    `cache_read_tokens` is charged at a fraction of the input rate.
+    """
+    p = resolve_pricing(model)
+    if p is None:
+        return None
+    discount = _cache_read_discount(model)
+    return (
+        input_tokens / 1_000_000 * p.input_per_1m
+        + cache_write_tokens / 1_000_000 * p.input_per_1m
+        + cache_read_tokens / 1_000_000 * p.input_per_1m * discount
+        + output_tokens / 1_000_000 * p.output_per_1m
+    )
+
