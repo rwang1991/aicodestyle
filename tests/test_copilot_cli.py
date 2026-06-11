@@ -237,8 +237,13 @@ def test_collector_extracts_billed_usage_from_shutdown(tmp_path: Path):
     session = CopilotCliCollector().parse(discovered)
 
     assert session.actual_usage is not None
-    assert session.actual_usage.input_tokens == 393500
+    # 393500 = 17 uncached + 311321 cache_read + 82162 cache_write.
+    # We normalise input_tokens to mean "uncached only" so pricing isn't double-charged.
+    assert session.actual_usage.input_tokens == 17
     assert session.actual_usage.cache_read_tokens == 311321
+    assert session.actual_usage.cache_write_tokens == 82162
+    assert session.actual_usage.output_tokens == 3546
     assert session.actual_usage.premium_requests == 1.0
     assert session.actual_usage_by_model["claude-opus-4.7-xhigh"].requests == 7
+    assert session.actual_usage_by_model["claude-opus-4.7-xhigh"].input_tokens == 17
 

@@ -24,11 +24,22 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
 def _usage_from_metrics_usage(u: dict) -> UsageRecord:
+    """Convert Copilot CLI `modelMetrics.<model>.usage` into a canonical UsageRecord.
+
+    Copilot CLI reports `inputTokens` as the AGGREGATE
+    (uncached_input + cache_read + cache_write). We normalise here so
+    `UsageRecord.input_tokens` always means "uncached input only", matching
+    the rate-card semantics in pricing.estimate_cost_usd_v2.
+    """
+    cache_read = int(u.get("cacheReadTokens") or 0)
+    cache_write = int(u.get("cacheWriteTokens") or 0)
+    raw_input = int(u.get("inputTokens") or 0)
+    uncached = max(0, raw_input - cache_read - cache_write)
     return UsageRecord(
-        input_tokens=int(u.get("inputTokens") or 0),
+        input_tokens=uncached,
         output_tokens=int(u.get("outputTokens") or 0),
-        cache_read_tokens=int(u.get("cacheReadTokens") or 0),
-        cache_write_tokens=int(u.get("cacheWriteTokens") or 0),
+        cache_read_tokens=cache_read,
+        cache_write_tokens=cache_write,
         reasoning_tokens=int(u.get("reasoningTokens") or 0),
     )
 
