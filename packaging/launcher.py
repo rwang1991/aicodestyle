@@ -25,7 +25,7 @@ def main() -> None:
     # dependency, but we don't pay the import cost until we actually need it.
     from aianalyzer.cli import app
 
-    app(prog_name="aianalyzer")
+    app(prog_name="aicodestyle")
 
 
 if __name__ == "__main__":

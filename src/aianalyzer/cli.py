@@ -27,7 +27,7 @@ from aianalyzer.features import (
 from aianalyzer.report.terminal import render_report
 from aianalyzer.store import FeatureStore
 
-app = typer.Typer(add_completion=False, help="Analyze your AI coding sessions.")
+app = typer.Typer(add_completion=False, help="AICodeStyle — analyze how you actually use AI coding assistants.")
 
 
 _COLLECTORS: dict[str, Collector] = {
@@ -144,7 +144,7 @@ def serve(
     import uvicorn
 
     url = f"http://{host}:{port}/"
-    typer.echo(f"AIAnalyzer portal: {url}")
+    typer.echo(f"AICodeStyle portal: {url}")
 
     if open_browser:
         def _open() -> None:

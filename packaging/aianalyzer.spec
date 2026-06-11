@@ -94,7 +94,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="aianalyzer",
+    name="aicodestyle",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -114,5 +114,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="aianalyzer",
+    name="aicodestyle",
 )

@@ -21,5 +21,5 @@ def test_root_serves_index_html():
     client = TestClient(create_app())
     r = client.get("/")
     assert r.status_code == 200
-    assert "AIAnalyzer" in r.text
+    assert "AICodeStyle" in r.text
     assert "chart.umd.js" in r.text

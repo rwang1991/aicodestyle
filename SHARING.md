@@ -1,8 +1,8 @@
-# Sharing AIAnalyzer with your team
+# Sharing AICodeStyle with your team
 
-The fastest way for a non-developer teammate to use AIAnalyzer is to download a
+The fastest way for a non-developer teammate to use AICodeStyle is to download a
 zipped Windows bundle, unzip it anywhere (Desktop, OneDrive, USB stick), and
-double-click `aianalyzer.exe`. The portal opens in their browser. No Python,
+double-click `AICodeStyle.exe`. The portal opens in their browser. No Python,
 no `pip`, no venv. The exe scans **their** local AI sessions on **their**
 machine — nothing leaves their box.
 
@@ -12,7 +12,7 @@ There are three paths depending on who you are sharing with.
 
 ## What gets scanned
 
-AIAnalyzer reads session logs from these AI coding tools on the teammate's
+AICodeStyle reads session logs from these AI coding tools on the teammate's
 machine:
 
 | AI tool | Status | Where it reads from |
@@ -39,14 +39,14 @@ cd <repo-root>
 ```
 
 Output:
-- `dist\aianalyzer\`   one-folder bundle (~115 MB, runs in place)
-- `dist\aianalyzer.zip`   shareable archive (~50 MB)
+- `dist\AICodeStyle\`   one-folder bundle (~115 MB, runs in place)
+- `dist\AICodeStyle.zip`   shareable archive (~50 MB)
 
 You only need the `.zip`.
 
 ### 2. Ship the zip
 
-Drop `aianalyzer.zip` in:
+Drop `AICodeStyle.zip` in:
 - Teams chat / channel,
 - OneDrive / SharePoint share,
 - internal file share,
@@ -54,11 +54,11 @@ Drop `aianalyzer.zip` in:
 
 ### 3. What your teammate does
 
-1. Save `aianalyzer.zip` somewhere they can write (Desktop is fine; do **not**
+1. Save `AICodeStyle.zip` somewhere they can write (Desktop is fine; do **not**
    leave it under `Downloads` on machines where Downloads is sandboxed).
 2. Right-click → **Extract All…** (or unzip with 7-Zip).
-3. Open the `aianalyzer` folder and double-click `aianalyzer.exe`.
-4. A console window opens, prints `AIAnalyzer portal: http://127.0.0.1:8765/`,
+3. Open the `AICodeStyle` folder and double-click `AICodeStyle.exe`.
+4. A console window opens, prints `AICodeStyle portal: http://127.0.0.1:8765/`,
    and the default browser opens to the portal automatically.
 5. To stop, close the console window.
 
@@ -79,7 +79,7 @@ portal renders data.
   blocks unsigned exes entirely, see option C below.
 - **Updating** is just: rebuild, reship the zip, teammate deletes the old
   folder and unzips the new one. Their session cache lives at
-  `%LOCALAPPDATA%\AIAnalyzer\` and survives the swap.
+  `%LOCALAPPDATA%\AICodeStyle\` and survives the swap.
 
 ---
 
@@ -88,19 +88,19 @@ portal renders data.
 If your teammate already has Python 3.11+ and `pip`:
 
 ```powershell
-git clone <repo-url> aianalyzer
-cd aianalyzer
+git clone <repo-url> AICodeStyle
+cd AICodeStyle
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e .
-aianalyzer serve
+AICodeStyle serve
 ```
 
 Or, once the repo lives at a stable URL, a one-liner via [pipx](https://pipx.pypa.io):
 
 ```powershell
 pipx install git+<repo-url>
-aianalyzer serve
+AICodeStyle serve
 ```
 
 This path tracks `main` and lets them pull updates with `git pull && pip install -e .`.
@@ -117,14 +117,14 @@ paths are:
 2. **Have them install Python from the Microsoft Store** (which is
    pre-allow-listed in most orgs) and use option B.
 3. **Run from WSL** — Python is unblocked in WSL on most managed Windows
-   builds. Inside WSL: `pip install -e .` then `aianalyzer serve --host 0.0.0.0`
+   builds. Inside WSL: `pip install -e .` then `AICodeStyle serve --host 0.0.0.0`
    and browse from Windows to `http://localhost:8765/`.
 
 ---
 
 ## What teammates will see
 
-- Console window with one line: `AIAnalyzer portal: http://127.0.0.1:8765/`
+- Console window with one line: `AICodeStyle portal: http://127.0.0.1:8765/`
 - Browser tab opens to a single-page portal with:
   - Their archetype + a 2D quadrant map (Architect / Pilot / Tinkerer / Vibe Coder)
   - A 6-spoke behavior radar (Planner, Questioner, TODO-driver, Hands-on,
@@ -143,8 +143,8 @@ All processing is local. No telemetry, no upload.
 ## FAQ
 
 **Q: Where is data stored?**
-`%LOCALAPPDATA%\AIAnalyzer\` — cache database + ingested session features.
-Safe to delete; AIAnalyzer rebuilds it on next launch.
+`%LOCALAPPDATA%\AICodeStyle\` — cache database + ingested session features.
+Safe to delete; AICodeStyle rebuilds it on next launch.
 
 **Q: How big is the download?**
 ~50 MB zipped, ~115 MB unzipped.

@@ -36,11 +36,11 @@ try {
     # PyInstaller silently bundles the other worktree's static/ assets.
     $env:PYTHONPATH = (Join-Path $repoRoot "src")
 
-    Write-Host "==> Building aianalyzer (one-folder bundle)" -ForegroundColor Cyan
+    Write-Host "==> Building aicodestyle (one-folder bundle)" -ForegroundColor Cyan
     python -m PyInstaller packaging/aianalyzer.spec --clean --noconfirm
 
-    $bundleDir = Join-Path $repoRoot "dist\aianalyzer"
-    $exe = Join-Path $bundleDir "aianalyzer.exe"
+    $bundleDir = Join-Path $repoRoot "dist\aicodestyle"
+    $exe = Join-Path $bundleDir "aicodestyle.exe"
     if (-not (Test-Path $exe)) {
         Write-Host "Build failed: $exe not found" -ForegroundColor Red
         exit 1
@@ -48,7 +48,7 @@ try {
 
     # Zip the bundle for distribution. One-folder mode gives us a portable
     # directory; the .zip is what teammates actually download and unzip.
-    $zip = Join-Path $repoRoot "dist\aianalyzer.zip"
+    $zip = Join-Path $repoRoot "dist\aicodestyle.zip"
     if (Test-Path $zip) { Remove-Item $zip }
     Compress-Archive -Path $bundleDir -DestinationPath $zip -CompressionLevel Optimal
 
@@ -62,8 +62,8 @@ try {
     Write-Host "To smoke-test:  & '$exe' --help"
     Write-Host "To run portal:  & '$exe'        (then browser opens automatically)"
     Write-Host ""
-    Write-Host "To share with a teammate: send them aianalyzer.zip; they unzip"
-    Write-Host "  anywhere (Desktop, OneDrive, etc.) and double-click aianalyzer.exe."
+    Write-Host "To share with a teammate: send them aicodestyle.zip; they unzip"
+    Write-Host "  anywhere (Desktop, OneDrive, etc.) and double-click aicodestyle.exe."
 }
 finally {
     Pop-Location

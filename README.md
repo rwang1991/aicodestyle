@@ -1,7 +1,7 @@
-# AIAnalyzer
+# AICodeStyle
 
 > **Know how you actually use AI.**
-> AIAnalyzer scans your local sessions from GitHub Copilot CLI, VS Code Copilot Chat, Claude Code, and more — and turns months of conversation history into a single, vivid report: your archetype, your habits, your token economy, and personalised tips to get more out of every AI dollar.
+> AICodeStyle scans your local sessions from GitHub Copilot CLI, VS Code Copilot Chat, Claude Code, and more — and turns months of conversation history into a single, vivid report: your archetype, your habits, your token economy, and personalised tips to get more out of every AI dollar.
 
 Everything runs on your machine. No accounts. No telemetry. No data ever leaves your laptop.
 
@@ -35,7 +35,7 @@ You use four different AI coding assistants every week. Each one keeps a convers
 - Where your monthly AI token budget actually goes.
 - Whether you behave more like an **architect** designing with an agent, or a **vibe-coder** trusting the model to figure it out.
 
-AIAnalyzer answers all of those — in one local-first dashboard you can open offline.
+AICodeStyle answers all of those — in one local-first dashboard you can open offline.
 
 ---
 
@@ -63,7 +63,7 @@ A grade card (A / B / C / D) across five axes — **Cost efficiency · Hands-on 
 
 ### 3. AI Profile narrative (auto-generated)
 
-If a local `copilot` CLI is on your PATH, AIAnalyzer asks it to write a 4-section Markdown profile (Who you are · How you work · Strengths · Suggestions) using your aggregated signals. **The narrative regenerates automatically after every scan.** If no copilot binary is installed, the section explains exactly that — no fake placeholder text.
+If a local `copilot` CLI is on your PATH, AICodeStyle asks it to write a 4-section Markdown profile (Who you are · How you work · Strengths · Suggestions) using your aggregated signals. **The narrative regenerates automatically after every scan.** If no copilot binary is installed, the section explains exactly that — no fake placeholder text.
 
 ### 4. KPI cards (12 of them)
 
@@ -130,15 +130,15 @@ The portal triggers a scan when you click **Scan sessions**. If nothing is found
 
 ## Quick start (Windows, no Python required)
 
-The fastest way to try AIAnalyzer.
+The fastest way to try AICodeStyle.
 
-1. Grab the latest **`aianalyzer.zip`** from the [Releases](#) page.
+1. Grab the latest **`AICodeStyle.zip`** from the [Releases](#) page.
 2. Right-click → **Extract All…** to anywhere you can write (Desktop, OneDrive, USB stick — but **not** under a sandboxed `Downloads`).
-3. Open the new `aianalyzer\` folder and double-click `aianalyzer.exe`.
-4. A console window opens, prints `AIAnalyzer portal: http://127.0.0.1:8765/`, and your browser pops to the portal automatically.
+3. Open the new `AICodeStyle\` folder and double-click `AICodeStyle.exe`.
+4. A console window opens, prints `AICodeStyle portal: http://127.0.0.1:8765/`, and your browser pops to the portal automatically.
 5. Click **Scan sessions** (first scan may take 10–30 s). The personality, coach, and full report render the moment the scan finishes.
 
-To stop: close the console window. To update: delete the old folder and unzip the new one — your cache at `%LOCALAPPDATA%\AIAnalyzer\` survives.
+To stop: close the console window. To update: delete the old folder and unzip the new one — your cache at `%LOCALAPPDATA%\AICodeStyle\` survives.
 
 ### Things to know up front
 
@@ -153,8 +153,8 @@ To stop: close the console window. To update: delete the old folder and unzip th
 Requires Python 3.11+.
 
 ```bash
-git clone <repo-url> aianalyzer
-cd aianalyzer
+git clone <repo-url> AICodeStyle
+cd AICodeStyle
 python -m venv .venv
 
 # Windows
@@ -169,11 +169,11 @@ Then:
 
 ```bash
 # Terminal report
-aianalyzer scan        # ingest sessions into the local DuckDB cache
-aianalyzer report      # print archetype + KPIs to the terminal
+AICodeStyle scan        # ingest sessions into the local DuckDB cache
+AICodeStyle report      # print archetype + KPIs to the terminal
 
 # Web portal (recommended)
-aianalyzer serve       # opens http://127.0.0.1:8765 automatically
+AICodeStyle serve       # opens http://127.0.0.1:8765 automatically
 ```
 
 Portal flags: `--host 0.0.0.0` (LAN), `--port 9000`, `--no-open-browser` (headless / SSH).
@@ -217,8 +217,8 @@ A **Download HTML report** button at the top exports the whole page as a self-co
 ## Privacy
 
 - **100% local.** No telemetry, no analytics pings, no calls home.
-- **Read-only.** AIAnalyzer never modifies a single session file. SQLite stores are opened with `file:?mode=ro` URIs so they coexist safely with a running VS Code or Copilot CLI.
-- **Local cache only.** Features and aggregates live in `%LOCALAPPDATA%\AIAnalyzer\` (Windows) / `~/.local/share/aianalyzer/` (Linux) / `~/Library/Application Support/AIAnalyzer/` (macOS). Safe to delete; rebuilds on next scan.
+- **Read-only.** AICodeStyle never modifies a single session file. SQLite stores are opened with `file:?mode=ro` URIs so they coexist safely with a running VS Code or Copilot CLI.
+- **Local cache only.** Features and aggregates live in `%LOCALAPPDATA%\AICodeStyle\` (Windows) / `~/.local/share/AICodeStyle/` (Linux) / `~/Library/Application Support/AICodeStyle/` (macOS). Safe to delete; rebuilds on next scan.
 - **Portal binds to `127.0.0.1`** by default. Use `--host 0.0.0.0` only if you knowingly want it on the LAN.
 - **PII redaction** runs at normalization time on prompts and assistant output: GitHub PATs, Bearer tokens, AWS keys, `password=` strings, and email addresses are scrubbed before features are computed.
 - **The optional AI Profile narrative** invokes your local `copilot` (or other CLI you configure) subprocess — that subprocess obeys whatever auth + network policy your existing install already uses. Nothing else makes a network call.
@@ -228,7 +228,7 @@ A **Download HTML report** button at the top exports the whole page as a self-co
 ## Architecture
 
 ```
-src/aianalyzer/
+src/AICodeStyle/
 ├── cli.py            # typer entry point: scan / report / serve
 ├── discovery.py      # find session files across Copilot CLI + VS Code (JSON + SQLite)
 ├── collectors/       # one parser per source format → NormalizedSession
@@ -252,7 +252,7 @@ src/aianalyzer/
     └── static/       # vanilla JS portal + Chart.js (no CDN)
 
 tests/                # 238 pytest tests
-packaging/build_exe.ps1   # one-folder PyInstaller bundle → dist/aianalyzer.zip
+packaging/build_exe.ps1   # one-folder PyInstaller bundle → dist/AICodeStyle.zip
 ```
 
 Cache schema is versioned (`SCHEMA_VERSION`); bumping it on a release forces a clean rebuild for upgraded users.
@@ -269,8 +269,8 @@ On a Windows box with Python 3.11+:
 
 Outputs:
 
-- `dist\aianalyzer\` — one-folder bundle (~120 MB, runs in place; no `%TEMP%` extraction so it works under most WDAC / AppLocker policies)
-- `dist\aianalyzer.zip` — shareable archive (~52 MB)
+- `dist\AICodeStyle\` — one-folder bundle (~120 MB, runs in place; no `%TEMP%` extraction so it works under most WDAC / AppLocker policies)
+- `dist\AICodeStyle.zip` — shareable archive (~52 MB)
 
 Ship the `.zip`. End-users unzip and double-click. See [SHARING.md](SHARING.md) for the full distribution playbook, including code-signing and WSL fallbacks.
 
@@ -278,7 +278,7 @@ Ship the `.zip`. End-users unzip and double-click. See [SHARING.md](SHARING.md) 
 
 ## Tuning the classifier
 
-The Planning × Control axes are computed from weighted signals in `src/aianalyzer/classifier/weights.yaml`. Bump a weight, restart the portal, click "Scan sessions" — your archetype recomputes immediately. Same goes for the coach (rules in `coaching.py`) and pricing rules (`pricing.py`).
+The Planning × Control axes are computed from weighted signals in `src/AICodeStyle/classifier/weights.yaml`. Bump a weight, restart the portal, click "Scan sessions" — your archetype recomputes immediately. Same goes for the coach (rules in `coaching.py`) and pricing rules (`pricing.py`).
 
 The defaults reflect a generalist developer profile. For specialised teams (e.g., research, ops, security), forking the weights is encouraged.
 
@@ -309,7 +309,7 @@ Up next:
 ## FAQ
 
 **Q: Where is data stored?**
-`%LOCALAPPDATA%\AIAnalyzer\` (Windows). Safe to delete; AIAnalyzer rebuilds on next launch.
+`%LOCALAPPDATA%\AICodeStyle\` (Windows). Safe to delete; AICodeStyle rebuilds on next launch.
 
 **Q: How big is the download?**
 ~52 MB zipped, ~120 MB unzipped.
@@ -318,10 +318,10 @@ Up next:
 No, unless the AI Profile narrative step is enabled — that calls your local `copilot` binary, which has its own auth + network policy.
 
 **Q: Can I run it on macOS / Linux?**
-The Python package works on both (`pip install -e .` and `aianalyzer serve`). The pre-built `.exe` is Windows-only — build a native bundle on each platform with the same PyInstaller spec.
+The Python package works on both (`pip install -e .` and `AICodeStyle serve`). The pre-built `.exe` is Windows-only — build a native bundle on each platform with the same PyInstaller spec.
 
 **Q: My report shows 0 VS Code sessions but I use Copilot Chat all the time. What gives?**
-VS Code Copilot Chat now stores sessions in either per-workspace JSON files *or* a single SQLite session store (post-Chat-rewrite). AIAnalyzer reads both. If you still see 0, check the **Data Sources** panel at the bottom of the report — it shows exactly which paths were scanned. File an issue with that output.
+VS Code Copilot Chat now stores sessions in either per-workspace JSON files *or* a single SQLite session store (post-Chat-rewrite). AICodeStyle reads both. If you still see 0, check the **Data Sources** panel at the bottom of the report — it shows exactly which paths were scanned. File an issue with that output.
 
 **Q: Will the report judge me?**
 No. Every archetype is a legitimate style. The coach tips are framed as opportunities, not failures — there's no "right" way to use AI.

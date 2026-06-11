@@ -52,7 +52,7 @@
     const supported = (result.supported_clients || []).map(humanizeClient);
     banner.innerHTML = `
       <strong>No sessions found yet.</strong>
-      AIAnalyzer looked for AI coding sessions in these locations:
+      AICodeStyle looked for AI coding sessions in these locations:
       <ul>
         <li><code>~/.copilot/session-state/</code> &mdash; GitHub Copilot CLI</li>
         <li><code>%APPDATA%/Code/User/workspaceStorage/&lt;workspace&gt;/chatSessions/</code> &mdash; VS Code Copilot Chat</li>
@@ -1113,12 +1113,12 @@
         const pad = (n) => String(n).padStart(2, "0");
         const ymd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
         const hms = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-        const stamp = `AIAnalyzer report · generated ${ymd} ${hms}`;
+        const stamp = `AICodeStyle report · generated ${ymd} ${hms}`;
 
         const fullHtml =
           "<!doctype html>\n" +
           "<html lang=\"en\"><head><meta charset=\"utf-8\">" +
-          `<title>AIAnalyzer report · ${ymd}</title>` +
+          `<title>AICodeStyle report · ${ymd}</title>` +
           inlineStyle +
           "<style>body{background:#0e1117;color:#e5e7eb;margin:0;}" +
           ".report-stamp{font:12px/1.4 system-ui;color:#94a3b8;padding:14px 24px;border-bottom:1px solid #1f2937;}" +
@@ -1140,7 +1140,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `aianalyzer-report-${ymd}.html`;
+        a.download = `aicodestyle-report-${ymd}.html`;
         document.body.appendChild(a);
         a.click();
         a.remove();
