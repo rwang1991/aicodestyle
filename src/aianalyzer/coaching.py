@@ -320,6 +320,74 @@ def _rule_c3_balance_win(p, features):
     )
 
 
+# --- Category D: session shape --------------------------------------------
+
+
+def _rule_d1_long_loops(p, features):
+    if p.avg_turns_per_session <= 30:
+        return None
+    return CoachTip(
+        rule_id="D1",
+        severity=Severity.TIP,
+        category="shape",
+        headline="Long iterative loops suggest under-specification",
+        body=(
+            f"Average session = {p.avg_turns_per_session:.0f} turns. That many rounds usually "
+            "means you discovered requirements mid-flight. Try a 'planning turn' up front: "
+            "list the goal, constraints, and acceptance criteria before any code."
+        ),
+        impact_estimate=0.6,
+        evidence={"avg_turns": p.avg_turns_per_session},
+    )
+
+
+def _rule_d2_long_sessions(p, features):
+    if p.total_sessions < 20:
+        return None
+    minutes = sorted([f.session_duration_sec / 60.0 for f in features if f.session_duration_sec > 0])
+    if not minutes:
+        return None
+    mid = minutes[len(minutes) // 2]
+    if mid <= 120:
+        return None
+    return CoachTip(
+        rule_id="D2",
+        severity=Severity.TIP,
+        category="shape",
+        headline="Long sessions risk context drift",
+        body=(
+            f"Median session is {mid:.0f} minutes. After ~90 minutes the model's working "
+            "context gets noisy and confidence drops. Checkpoint progress and start fresh."
+        ),
+        impact_estimate=0.4,
+        evidence={"median_session_minutes": mid},
+    )
+
+
+def _rule_d3_late_night(p, features):
+    if p.total_sessions < 15:
+        return None
+    late = sum(1 for f in features if f.started_hour_local >= 22 or f.started_hour_local <= 2)
+    if not features:
+        return None
+    share = late / len(features)
+    if share <= 0.40:
+        return None
+    return CoachTip(
+        rule_id="D3",
+        severity=Severity.HEADS_UP,
+        category="shape",
+        headline="Lots of late-night AI work",
+        body=(
+            f"{share*100:.0f}% of your sessions start between 22:00 and 02:00 local. "
+            "Late-night code from any source — human or AI — has higher defect rates. "
+            "Schedule a morning review before merging."
+        ),
+        impact_estimate=0.5,
+        evidence={"late_night_share": share},
+    )
+
+
 def compute_coach_report(
     profile: ExtendedProfile,
     features: Iterable[SessionFeatures],

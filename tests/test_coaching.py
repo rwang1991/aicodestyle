@@ -280,3 +280,73 @@ def test_hands_on_share_clamps_unbounded_agency_rates():
     assert tip is not None
     assert "0%" in tip.body  # not "-240%"
     assert _rule_c3_balance_win(p, fs) is None
+
+
+def _features_with_duration_minutes(values: list[float]) -> list[SessionFeatures]:
+    return [
+        SessionFeatures(
+            session_id=f"s{i}",
+            client="copilot-cli",
+            started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            session_duration_sec=v * 60.0,
+        )
+        for i, v in enumerate(values)
+    ]
+
+
+def _features_with_start_hour(hours: list[int]) -> list[SessionFeatures]:
+    return [
+        SessionFeatures(
+            session_id=f"s{i}",
+            client="copilot-cli",
+            started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            started_hour_local=h,
+        )
+        for i, h in enumerate(hours)
+    ]
+
+
+def test_rule_d1_long_iterative_loops():
+    from aianalyzer.coaching import _rule_d1_long_loops
+    p = _profile_with(avg_turns_per_session=42)
+    tip = _rule_d1_long_loops(p, [])
+    assert tip is not None
+    assert tip.rule_id == "D1"
+
+
+def test_rule_d1_skips_short_avg():
+    from aianalyzer.coaching import _rule_d1_long_loops
+    p = _profile_with(avg_turns_per_session=15)
+    assert _rule_d1_long_loops(p, []) is None
+
+
+def test_rule_d2_long_sessions():
+    from aianalyzer.coaching import _rule_d2_long_sessions
+    p = _profile_with(total_sessions=25)
+    fs = _features_with_duration_minutes([150] * 25)
+    tip = _rule_d2_long_sessions(p, fs)
+    assert tip is not None
+    assert tip.rule_id == "D2"
+
+
+def test_rule_d2_skips_when_short():
+    from aianalyzer.coaching import _rule_d2_long_sessions
+    p = _profile_with(total_sessions=25)
+    fs = _features_with_duration_minutes([40] * 25)
+    assert _rule_d2_long_sessions(p, fs) is None
+
+
+def test_rule_d3_late_night():
+    from aianalyzer.coaching import _rule_d3_late_night
+    p = _profile_with(total_sessions=20)
+    fs = _features_with_start_hour([23] * 10 + [14] * 10)
+    tip = _rule_d3_late_night(p, fs)
+    assert tip is not None
+    assert tip.severity == Severity.HEADS_UP
+
+
+def test_rule_d3_skips_when_balanced():
+    from aianalyzer.coaching import _rule_d3_late_night
+    p = _profile_with(total_sessions=20)
+    fs = _features_with_start_hour([10, 14, 16, 22] * 5)
+    assert _rule_d3_late_night(p, fs) is None
