@@ -207,7 +207,7 @@ def test_rule_a5_unpriced_share_high():
     p = _profile_with(priced_token_share=0.70, est_total_tokens=500_000)
     tip = _rule_a5_unpriced_share(p, [])
     assert tip is not None
-    assert "30" in tip.body or "30%" in tip.body  # 1 - 0.70 = 30%
+    assert "30" in tip.headline or "30%" in tip.headline  # 1 - 0.70 = 30%
 
 
 def test_rule_a5_skips_when_priced_share_high():

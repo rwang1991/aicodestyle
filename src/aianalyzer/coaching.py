@@ -58,7 +58,7 @@ def _rule_a1_output_input_high(p, features):
         category="cost",
         headline="Tighten your asks — AI is generating 3× what you type",
         body=(
-            f"Output:input is {ratio:.1f}×. Long answers cost tokens AND review time. "
+            f"Output:input is {ratio:.2f}×. Long answers cost tokens AND review time. "
             "Try asking for the smallest useful unit (one function, one decision)."
         ),
         impact_estimate=min(1.0, (ratio - 3.0) / 5.0),
@@ -144,7 +144,6 @@ def _rule_a5_unpriced_share(p, features):
         category="cost",
         headline=f"{unpriced*100:.0f}% of your tokens are on unidentified models",
         body=(
-            f"{unpriced*100:.0f}% of your tokens are on unidentified models. "
             "We couldn't price every model you used (likely internal-named or experimental). "
             "Pin your default model in each client so the cost picture is complete."
         ),
@@ -182,7 +181,7 @@ def _rule_a6_premium_for_quick(p, features):
 
 
 def _rule_b1_short_prompts(p, features):
-    if p.total_sessions < 10 or p.median_prompt_words >= 10:
+    if p.total_sessions < 10 or p.median_prompt_words >= 10 or p.median_prompt_words == 0:
         return None
     return CoachTip(
         rule_id="B1",
@@ -367,7 +366,7 @@ def _rule_d2_long_sessions(p, features):
 def _rule_d3_late_night(p, features):
     if p.total_sessions < 15:
         return None
-    late = sum(1 for f in features if f.started_hour_local >= 22 or f.started_hour_local <= 2)
+    late = sum(1 for f in features if f.started_hour_local >= 22 or f.started_hour_local < 2)
     if not features:
         return None
     share = late / len(features)
