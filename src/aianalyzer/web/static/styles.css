@@ -594,3 +594,62 @@ main { padding: 24px; max-width: 1280px; margin: 0 auto; display: flex; flex-dir
 }
 .token-top-table th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
 .token-top-table td:nth-child(3), .token-top-table td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
+/* --- Phase G: AI Coach card --------------------------------------------- */
+.coach-card { padding: 24px; }
+.coach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+.coach-header h2 { margin: 0; font-size: 1.25rem; }
+.coach-score-block { text-align: right; }
+.coach-score {
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6366f1, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1;
+}
+.coach-band {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted, #94a3b8);
+}
+.coach-subscores {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.coach-sub {
+  background: var(--bg-muted, #1f2937);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+.coach-sub-label { font-size: 0.75rem; color: var(--muted, #94a3b8); text-transform: uppercase; }
+.coach-sub-value { font-size: 1.5rem; font-weight: 600; margin-top: 4px; }
+.coach-tips { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.coach-tip {
+  border-left: 4px solid var(--tip-color, #6366f1);
+  background: var(--bg-muted, #1f2937);
+  padding: 14px 16px;
+  border-radius: 6px;
+}
+.coach-tip.heads_up { --tip-color: #ef4444; }
+.coach-tip.tip { --tip-color: #6366f1; }
+.coach-tip.win { --tip-color: #10b981; }
+.coach-tip-headline { font-weight: 600; margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+.coach-tip-icon { font-size: 1.1rem; }
+.coach-tip-body { font-size: 0.9rem; color: var(--text-secondary, #cbd5e1); }
+.coach-disclaimer {
+  margin-top: 16px;
+  font-size: 0.75rem;
+  color: var(--muted, #94a3b8);
+  font-style: italic;
+}

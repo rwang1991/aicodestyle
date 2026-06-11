@@ -257,6 +257,57 @@
     return String(n);
   }
 
+  const _COACH_SEVERITY_ICON = { heads_up: "⚠️", tip: "💡", win: "✨" };
+  const _COACH_SUB_LABEL = { cost: "Cost", handson: "Hands-on", prompt: "Prompt", shape: "Shape" };
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function renderCoach(coach) {
+    const card = document.getElementById("coach-card");
+    if (!card) return;
+    if (!coach || ((coach.tips || []).length === 0 && (coach.score ?? 0) === 0)) {
+      card.classList.add("hidden");
+      return;
+    }
+    card.classList.remove("hidden");
+
+    document.getElementById("coach-score").textContent = String(coach.score ?? 0);
+    document.getElementById("coach-band").textContent = coach.band || "—";
+
+    const sub = document.getElementById("coach-subscores");
+    sub.innerHTML = "";
+    for (const key of ["cost", "handson", "prompt", "shape"]) {
+      const val = (coach.sub_scores || {})[key] ?? 0;
+      const cell = document.createElement("div");
+      cell.className = "coach-sub";
+      cell.innerHTML = `
+        <div class="coach-sub-label">${_COACH_SUB_LABEL[key]}</div>
+        <div class="coach-sub-value">${val}<span style="font-size:.7em;opacity:.5">/25</span></div>
+      `;
+      sub.appendChild(cell);
+    }
+
+    const tipsList = document.getElementById("coach-tips");
+    tipsList.innerHTML = "";
+    for (const t of (coach.tips || [])) {
+      const li = document.createElement("li");
+      li.className = `coach-tip ${t.severity}`;
+      const icon = _COACH_SEVERITY_ICON[t.severity] || "•";
+      li.innerHTML = `
+        <div class="coach-tip-headline"><span class="coach-tip-icon">${icon}</span>${escapeHtml(t.headline)}</div>
+        <div class="coach-tip-body">${escapeHtml(t.body)}</div>
+      `;
+      tipsList.appendChild(li);
+    }
+  }
+
   function renderTokenCard(te, sessionCount) {
     const card = document.getElementById("token-card");
     if (!card) return;
@@ -732,6 +783,7 @@
     renderWeekHourHeatmap(p.weekday_hour_matrix, p.peak_cell);
     renderModelTier(p.model_tier_counts);
     renderTokenCard(p.token_economy, p.total_sessions || 0);
+    renderCoach(p.coach);
 
     const hourHist = p.hour_histogram || [];
     if (hourHist.length === 24) {
