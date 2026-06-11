@@ -263,3 +263,20 @@ def test_rule_c3_balance_win():
     tip = _rule_c3_balance_win(p, fs)
     assert tip is not None
     assert tip.severity == Severity.WIN
+
+
+def test_hands_on_share_clamps_unbounded_agency_rates():
+    # ai_agency_rate = tool_calls / user_msgs is unbounded above; real
+    # corpora show 5-10. Without clamping, share would go negative and
+    # C1 would fire for everyone while C3 would be unreachable.
+    from aianalyzer.coaching import _hands_on_share, _rule_c1_hands_off, _rule_c3_balance_win
+    fs = _features_with_agency([5.0, 8.0, 10.0, 3.0, 6.0] * 6)  # 30 sessions
+    share = _hands_on_share(fs)
+    assert share is not None
+    assert 0.0 <= share <= 1.0
+    p = _profile_with(total_sessions=30)
+    # With all rates >= 1.0, every session clamps to 1.0 → share == 0.0 → C1 fires
+    tip = _rule_c1_hands_off(p, fs)
+    assert tip is not None
+    assert "0%" in tip.body  # not "-240%"
+    assert _rule_c3_balance_win(p, fs) is None

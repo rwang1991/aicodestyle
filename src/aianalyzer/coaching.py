@@ -252,7 +252,12 @@ def _hands_on_share(features) -> float | None:
         fs = list(features)
     if not fs:
         return None
-    return 1.0 - (sum(f.ai_agency_rate for f in fs) / len(fs))
+    # ai_agency_rate = tool_calls / user_msgs is unbounded above (real
+    # corpora routinely show 5-10+). Clamp per-session to [0, 1] so
+    # `1 - mean(...)` stays in [0, 1] and the rule thresholds remain
+    # meaningful (otherwise C1 fires for every real user and C3 is
+    # unreachable). See weights.yaml normalizer (max 8.0) for context.
+    return 1.0 - (sum(min(1.0, f.ai_agency_rate) for f in fs) / len(fs))
 
 
 def _rule_c1_hands_off(p, features):
