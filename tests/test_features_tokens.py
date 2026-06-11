@@ -9,6 +9,7 @@ from aianalyzer.normalize import (
     NormalizedSession,
     Turn,
     UserMessage,
+    UsageRecord,
 )
 
 
@@ -66,3 +67,29 @@ def test_token_economy_cost_none_for_unknown_model():
     assert f.est_total_tokens > 0
     assert f.est_cost_usd is None
     assert f.priced_token_share == 0.0
+def test_actual_usage_fields_prefer_billed_totals():
+    usage = UsageRecord(
+        input_tokens=100,
+        output_tokens=200,
+        cache_read_tokens=1000,
+        cache_write_tokens=50,
+        premium_requests=2.5,
+    )
+    session = NormalizedSession(
+        session_id="actual-s1",
+        client="copilot-cli",
+        started_at=_ts(),
+        ended_at=_ts(60),
+        turns=[_turn(0, "hello", "world", "claude-opus")],
+        actual_usage=usage,
+        actual_usage_by_model={"claude-opus": usage},
+    )
+
+    f = extract_session_features(session)
+
+    assert f.actual_total_tokens == 1350
+    assert f.has_actual_usage is True
+    assert f.actual_cost_usd is not None and f.actual_cost_usd > 0
+    assert f.premium_requests == 2.5
+
+

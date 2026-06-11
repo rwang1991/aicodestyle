@@ -150,6 +150,16 @@ class SessionFeatures(BaseModel):
     est_total_tokens: int = 0
     est_cost_usd: float | None = None
     priced_token_share: float = 0.0
+    actual_input_tokens: int = 0
+    actual_output_tokens: int = 0
+    actual_cache_read_tokens: int = 0
+    actual_cache_write_tokens: int = 0
+    actual_reasoning_tokens: int = 0
+    actual_total_tokens: int = 0
+    actual_cost_usd: float | None = None
+    premium_requests: float = 0.0
+    nano_aiu: int = 0
+    has_actual_usage: bool = False
 
 
 def _user_messages(turns: Iterable[Turn]) -> list[str]:
@@ -480,6 +490,32 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
     est_total = est_in + est_out
     priced_share = (priced_tokens / est_total) if est_total > 0 else 0.0
 
+    actual = session.actual_usage
+    actual_total = 0
+    actual_cost = None
+    if actual is not None:
+        from aianalyzer.pricing import estimate_cost_usd_v2
+        actual_total = (
+            actual.input_tokens
+            + actual.output_tokens
+            + actual.cache_read_tokens
+            + actual.cache_write_tokens
+        )
+        cost_sum = 0.0
+        has_any_priced = False
+        for model, u in (session.actual_usage_by_model or {}).items():
+            c = estimate_cost_usd_v2(
+                model,
+                u.input_tokens,
+                u.output_tokens,
+                u.cache_read_tokens,
+                u.cache_write_tokens,
+            )
+            if c is not None:
+                cost_sum += c
+                has_any_priced = True
+        actual_cost = cost_sum if has_any_priced else None
+
     return SessionFeatures(
         session_id=session.session_id,
         client=session.client,
@@ -525,6 +561,16 @@ def extract_session_features(session: NormalizedSession) -> SessionFeatures:
         est_total_tokens=est_total,
         est_cost_usd=(cost_usd if has_priced_turn else None),
         priced_token_share=priced_share,
+        actual_input_tokens=actual.input_tokens if actual else 0,
+        actual_output_tokens=actual.output_tokens if actual else 0,
+        actual_cache_read_tokens=actual.cache_read_tokens if actual else 0,
+        actual_cache_write_tokens=actual.cache_write_tokens if actual else 0,
+        actual_reasoning_tokens=actual.reasoning_tokens if actual else 0,
+        actual_total_tokens=actual_total,
+        actual_cost_usd=actual_cost,
+        premium_requests=actual.premium_requests if actual else 0.0,
+        nano_aiu=actual.nano_aiu if actual else 0,
+        has_actual_usage=actual is not None,
     )
 
 

@@ -60,5 +60,8 @@ def test_all_signal_fields_defined():
         # Token economy (Phase F)
         "est_input_tokens", "est_output_tokens", "est_total_tokens",
         "est_cost_usd", "priced_token_share",
+        "actual_input_tokens", "actual_output_tokens", "actual_cache_read_tokens",
+        "actual_cache_write_tokens", "actual_reasoning_tokens", "actual_total_tokens",
+        "actual_cost_usd", "premium_requests", "nano_aiu", "has_actual_usage",
     }
     assert set(SessionFeatures.model_fields.keys()) == expected_fields
