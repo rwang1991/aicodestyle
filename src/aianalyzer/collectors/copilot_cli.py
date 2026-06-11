@@ -14,12 +14,71 @@ from aianalyzer.normalize import (
     ToolCall,
     TodoSnapshot,
     Turn,
+    UsageRecord,
     UserMessage,
 )
 from aianalyzer.redact import redact
 
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def _usage_from_metrics_usage(u: dict) -> UsageRecord:
+    return UsageRecord(
+        input_tokens=int(u.get("inputTokens") or 0),
+        output_tokens=int(u.get("outputTokens") or 0),
+        cache_read_tokens=int(u.get("cacheReadTokens") or 0),
+        cache_write_tokens=int(u.get("cacheWriteTokens") or 0),
+        reasoning_tokens=int(u.get("reasoningTokens") or 0),
+    )
+
+
+def _extract_usage(events: list[dict]) -> tuple[Optional[UsageRecord], dict[str, UsageRecord]]:
+    """Find the session.shutdown event and pull billed numbers from tokenDetails + modelMetrics.
+
+    Returns (session_total, by_model). Both empty if no shutdown event.
+    """
+    shutdown = next((e for e in events if e.get("type") == "session.shutdown"), None)
+    if not shutdown:
+        return None, {}
+    data = shutdown.get("data") or {}
+
+    by_model: dict[str, UsageRecord] = {}
+    metrics = data.get("modelMetrics") or {}
+    for model, m in metrics.items():
+        if not isinstance(m, dict):
+            continue
+        usage = _usage_from_metrics_usage(m.get("usage") or {})
+        req = m.get("requests") or {}
+        by_model[model] = usage.model_copy(update={
+            "requests": int(req.get("count") or 0),
+            "premium_requests": float(req.get("cost") or 0.0),
+            "nano_aiu": int(m.get("totalNanoAiu") or 0),
+        })
+
+    if by_model:
+        total = UsageRecord(
+            input_tokens=sum(u.input_tokens for u in by_model.values()),
+            output_tokens=sum(u.output_tokens for u in by_model.values()),
+            cache_read_tokens=sum(u.cache_read_tokens for u in by_model.values()),
+            cache_write_tokens=sum(u.cache_write_tokens for u in by_model.values()),
+            reasoning_tokens=sum(u.reasoning_tokens for u in by_model.values()),
+            requests=sum(u.requests for u in by_model.values()),
+            premium_requests=float(data.get("totalPremiumRequests") or sum(u.premium_requests for u in by_model.values())),
+            nano_aiu=int(data.get("totalNanoAiu") or sum(u.nano_aiu for u in by_model.values())),
+        )
+    else:
+        td = data.get("tokenDetails") or {}
+        get = lambda k: int(((td.get(k) or {}).get("tokenCount")) or 0)
+        total = UsageRecord(
+            input_tokens=get("input"),
+            output_tokens=get("output"),
+            cache_read_tokens=get("cache_read"),
+            cache_write_tokens=get("cache_write"),
+            premium_requests=float(data.get("totalPremiumRequests") or 0.0),
+            nano_aiu=int(data.get("totalNanoAiu") or 0),
+        )
+    return total, by_model
 
 
 class CopilotCliCollector:
@@ -167,6 +226,7 @@ class CopilotCliCollector:
             _flush_turn()
 
         todos = _read_todos(discovered.db_path)
+        actual_usage, actual_usage_by_model = _extract_usage(events)
 
         return NormalizedSession(
             client="copilot-cli",
@@ -178,6 +238,8 @@ class CopilotCliCollector:
             turns=turns,
             todos=todos,
             raw_mtime=discovered.mtime,
+            actual_usage=actual_usage,
+            actual_usage_by_model=actual_usage_by_model,
         )
 
     def _empty(self, d: DiscoveredSession) -> NormalizedSession:

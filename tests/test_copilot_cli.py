@@ -220,3 +220,25 @@ def test_collector_handles_real_corpus_without_crash():
         except Exception as exc:  # noqa: BLE001
             crashes.append((d.session_id, type(exc).__name__, str(exc)[:120]))
     assert not crashes, f"Crashes on real corpus: {crashes[:5]}"
+def test_collector_extracts_billed_usage_from_shutdown(tmp_path: Path):
+    events_text = textwrap.dedent(
+        """\
+        {"type":"session.start","timestamp":"2026-06-09T10:00:00Z","data":{"sessionId":"s","context":{"cwd":"."}}}
+        {"type":"session.shutdown","timestamp":"2026-06-09T10:00:01Z","data":{"shutdownType":"routine","totalPremiumRequests":1,"totalNanoAiu":75790800000,"tokenDetails":{"input":{"tokenCount":17},"cache_read":{"tokenCount":311321},"cache_write":{"tokenCount":82162},"output":{"tokenCount":3546}},"modelMetrics":{"claude-opus-4.7-xhigh":{"requests":{"count":7,"cost":1},"usage":{"inputTokens":393500,"outputTokens":3546,"cacheReadTokens":311321,"cacheWriteTokens":82162,"reasoningTokens":0},"totalNanoAiu":75790800000}}}}
+        """
+    )
+    events = tmp_path / "events.jsonl"
+    events.write_text(events_text, encoding="utf-8")
+    discovered = DiscoveredSession(
+        client="copilot-cli", session_id="s", root=tmp_path,
+        events_path=events, db_path=None, mtime=events.stat().st_mtime,
+    )
+
+    session = CopilotCliCollector().parse(discovered)
+
+    assert session.actual_usage is not None
+    assert session.actual_usage.input_tokens == 393500
+    assert session.actual_usage.cache_read_tokens == 311321
+    assert session.actual_usage.premium_requests == 1.0
+    assert session.actual_usage_by_model["claude-opus-4.7-xhigh"].requests == 7
+
