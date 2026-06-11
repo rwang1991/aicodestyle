@@ -38,7 +38,6 @@ Everything runs on your machine. No accounts. No telemetry. No data ever leaves 
 - [Supported AI tools](#supported-ai-tools)
 - [Quick start (Windows, no Python required)](#quick-start-windows-no-python-required)
 - [Quick start (developers)](#quick-start-developers)
-- [The portal at a glance](#the-portal-at-a-glance)
 - [Privacy](#privacy)
 - [Architecture](#architecture)
 - [Building your own shareable bundle](#building-your-own-shareable-bundle)
@@ -65,76 +64,20 @@ AICodeStyle answers all of those — in one local-first dashboard you can open o
 
 ## What you get
 
-After one click ("Scan sessions"), the portal generates a single-page report. Top to bottom:
+Run one scan and the portal builds a single-page report with everything below. The screenshots above show each section live; the descriptions here are intentionally short.
 
-### 1. AI Personality
-
-A nickname + tagline + 3–6 *Did you know?* facts mined directly from your prompts. Examples:
-
-> 🦅 **The Prolific Pilot** &nbsp;·&nbsp; *Plans first, then lets the AI fly*
-> - 🌙 Your latest session ended at **02:47 AM** on a Tuesday.
-> - ✍️ Your longest single prompt was **1,284 words** — more text than this README's intro.
-> - 🏃 11 sessions in a single day on Mar 14 (your personal record).
-> - 🔁 You ran the same multi-line refactor request three times in 20 minutes.
-
-### 2. AI Coach 🎯
-
-A grade card (A / B / C / D) across five axes — **Cost efficiency · Hands-on balance · Prompt quality · Session shape · Model mix** — plus 2–6 prioritised, severity-tagged tips written from rules that fire only when your data triggers them. Examples:
-
-- *"You spent 38% of your premium-request budget on prompts <30 words — try GPT-4o mini for these."*
-- *"73% of your sessions exceed 2 hours — try splitting after the first checkpoint."*
-- *"You almost never paste file paths into prompts — your acceptance rate drops 22% in those sessions."*
-
-### 3. AI Profile narrative (auto-generated)
-
-If a local `copilot` CLI is on your PATH, AICodeStyle asks it to write a 4-section Markdown profile (Who you are · How you work · Strengths · Suggestions) using your aggregated signals. **The narrative regenerates automatically after every scan.** If no copilot binary is installed, the section explains exactly that — no fake placeholder text.
-
-### 4. KPI cards (12 of them)
-
-Total sessions, total turns, total hours, active days, longest streak, avg / median / p90 turns per session, avg / median / p90 prompt words, acceptance rate, first session date.
-
-### 5. Charts (Chart.js, vendored locally — no CDN)
-
-- **Session-purpose doughnut** — every session is classified into one of 10 purposes (feature work, debugging, testing, refactoring, code review, learning, documentation, configuration, planning, casual chat).
-- **Top tools** bar — most-invoked tool names across all sessions.
-- **90-day activity** line — sessions per day over the trailing quarter.
-- **Hour-of-day** bar — when you actually code with AI.
-- **Weekday** bar — Monday warrior or weekend ninja?
-
-### 6. GitHub-style activity heatmap
-
-A 12-month calendar grid showing session intensity per day. Hover any cell for the exact count.
-
-### 7. Archetype quadrant
-
-A 2-axis Planning × Control map placing you in one of four primary archetypes:
-
-|              | High Control                    | Low Control                    |
-| ------------ | ------------------------------- | ------------------------------ |
-| **High Planning** | 🏛️ **Architect** — designs first, drives tools | 🛩️ **Pilot** — plans, then lets the AI fly |
-| **Low Planning**  | 🔧 **Tinkerer** — hands-on, exploratory       | 🌊 **Vibe Coder** — "just build it, ship it" |
-
-A 6-spoke radar (Planner · Questioner · TODO-driver · Hands-on · Deliberator · Multi-tasker) adds nuance, and modifier tags (`debugger`, `parallelist`, `yolo`, …) appear when triggered.
-
-### 8. Achievement badges
-
-Things like 🏆 **Streak master** (14-day run), 🌙 **Night owl** (≥30 % of activity after 10 PM), 💬 **Conversationalist** (≥50 turns/session avg), 📚 **Polyglot** (≥4 file extensions), ⚡ **Speed runner** (median session <8 minutes), ✨ **Specialist**, 🎓 **Veteran**…
-
-### 9. Token economy
-
-Total billed tokens, prompt vs. completion split, premium-request count, estimated cost in USD, breakdown per model, and a "cost per accepted suggestion" derived metric. Cost rules in `pricing.py` are tunable.
-
-### 10. Top-N tables
-
-Most-used projects, models, file extensions, with counts and percentages.
-
-### 11. Data Sources
-
-A transparency panel showing every scanner that ran, what it found, and where it looked — so when the report says "237 VS Code sessions" you can verify it across both the legacy per-workspace JSON store and the new SQLite session store.
-
-### 12. Download as HTML report
-
-One-click export. Self-contained HTML you can email yourself, archive, or compare month-over-month.
+- **AI Personality** — nickname + tagline + 3–6 *Did you know?* facts mined from your own prompts (longest prompt, latest session, busiest day, repeat-prompt streaks…).
+- **AI Coach** — A–D grade across five axes (cost · hands-on · prompt · shape · model mix), plus 2–6 prioritised, severity-tagged tips written from rules that only fire when your data triggers them.
+- **AI Profile narrative** — a 4-section Markdown story (Who you are · How you work · Strengths · Suggestions) auto-generated by the local `copilot` CLI from your aggregated signals. If no `copilot` binary is on PATH, the section says exactly that — no fake placeholder.
+- **12 KPI cards** — total sessions, turns, engaged hours, active days, longest streak, avg/median/p90 turns per session, avg/median/p90 prompt words, acceptance rate, first session date.
+- **5 charts** (Chart.js, vendored — no CDN) — session-purpose doughnut (10 purpose classes), top tools, 90-day activity line, hour-of-day, weekday.
+- **12-month activity heatmap** — GitHub-style grid with per-day session counts on hover.
+- **Archetype quadrant + 6-spoke behavior radar** — Planning × Control map placing you in one of four archetypes (🏛️ Architect · 🛩️ Pilot · 🔧 Tinkerer · 🌊 Vibe Coder), plus a radar of six independent traits (Planner · Questioner · TODO-driver · Hands-on · Deliberator · Multi-tasker) and modifier tags (`debugger`, `parallelist`, `yolo`…).
+- **Achievement badges** — 🏆 Streak master, 🌙 Night owl, 💬 Conversationalist, 📚 Polyglot, ⚡ Speed runner, ✨ Specialist, 🎓 Veteran…
+- **Token economy** — real billed totals when the source records them (Copilot CLI's `session.shutdown`), `cl100k_base` estimates otherwise. Breakdown per model, cache reads/writes, premium-request count, top-5 most expensive sessions.
+- **Top-N tables** — most-used projects, models, file extensions, with counts and percentages.
+- **Data Sources panel** — transparency about every scanner that ran, what it found, and where it looked.
+- **Download as HTML** — one-click self-contained report you can email yourself, archive, or compare month-over-month.
 
 ---
 
@@ -207,34 +150,6 @@ Run tests:
 ```bash
 python -m pytest        # 238 tests, all should pass
 ```
-
----
-
-## The portal at a glance
-
-Sections render in this order so the most personal, vivid material comes first and the supporting evidence comes after:
-
-```
-┌──────────────────────────────────────────────┐
-│ 🦅 The Prolific Pilot · "Plans, then lets…"  │  ← Personality
-│ Did you know? · 3–6 vivid facts              │
-├──────────────────────────────────────────────┤
-│ AI Coach 🎯  · Grade A · 4 prioritised tips  │  ← Coach
-├──────────────────────────────────────────────┤
-│ AI Profile (auto)  · 4-section narrative     │  ← Markdown narrative
-├──────────────────────────────────────────────┤
-│ 12 KPI cards                                 │
-│ 5 charts                                     │
-│ 12-month heatmap                             │
-│ Archetype quadrant + radar                   │
-│ Achievement badges                           │
-│ Token economy                                │
-│ Top projects / models / extensions           │
-│ Data sources transparency panel              │
-└──────────────────────────────────────────────┘
-```
-
-A **Download HTML report** button at the top exports the whole page as a self-contained file.
 
 ---
 
