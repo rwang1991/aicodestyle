@@ -81,9 +81,18 @@ def test_score_apprentice():
 
 
 def test_score_sub_scores_each_capped_at_25():
-    p = _profile_with(total_sessions=50, output_to_input_ratio=1.5, priced_token_share=1.0)
+    # Set all 4 sub-score inputs into their sweet spots so every score
+    # path executes int(round(25 * fit)) — not the == 0 early returns.
+    p = _profile_with(
+        total_sessions=50,
+        output_to_input_ratio=1.5,
+        priced_token_share=1.0,
+        avg_turns_per_session=10.0,   # inside [4, 20]
+        median_prompt_words=70,       # inside [30, 160]
+    )
     fs = _features_with_agency([0.65] * 50)
     rep = compute_coach_report(p, fs)
+    assert set(rep.sub_scores.keys()) == {"cost", "handson", "prompt", "shape"}
     for v in rep.sub_scores.values():
         assert 0 <= v <= 25
 
