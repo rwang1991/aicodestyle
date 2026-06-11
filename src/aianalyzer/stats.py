@@ -84,6 +84,16 @@ class ExtendedProfile:
     est_cost_usd: float = 0.0
     priced_token_share: float = 0.0
     output_to_input_ratio: float = 0.0
+    actual_total_tokens: int = 0
+    actual_input_tokens: int = 0
+    actual_output_tokens: int = 0
+    actual_cache_read_tokens: int = 0
+    actual_cache_write_tokens: int = 0
+    actual_reasoning_tokens: int = 0
+    actual_cost_usd: float = 0.0
+    total_premium_requests: float = 0.0
+    total_nano_aiu: int = 0
+    sessions_with_actual_usage: int = 0
     # Pareto: smallest number of sessions that account for >=80% of total
     # token spend. A small number = "a few big sessions dominate".
     sessions_for_80pct_tokens: int = 0
@@ -314,6 +324,16 @@ def compute_extended_profile(features: Iterable[SessionFeatures]) -> ExtendedPro
     p.output_to_input_ratio = (
         p.est_output_tokens / p.est_input_tokens if p.est_input_tokens > 0 else 0.0
     )
+    p.actual_input_tokens = sum(f.actual_input_tokens for f in fs)
+    p.actual_output_tokens = sum(f.actual_output_tokens for f in fs)
+    p.actual_cache_read_tokens = sum(f.actual_cache_read_tokens for f in fs)
+    p.actual_cache_write_tokens = sum(f.actual_cache_write_tokens for f in fs)
+    p.actual_reasoning_tokens = sum(f.actual_reasoning_tokens for f in fs)
+    p.actual_total_tokens = sum(f.actual_total_tokens for f in fs)
+    p.actual_cost_usd = sum((f.actual_cost_usd or 0.0) for f in fs)
+    p.total_premium_requests = sum(f.premium_requests for f in fs)
+    p.total_nano_aiu = sum(f.nano_aiu for f in fs)
+    p.sessions_with_actual_usage = sum(1 for f in fs if f.has_actual_usage)
     # priced_token_share at the profile level is token-weighted, not
     # session-weighted, so a single huge unpriced session correctly drags it
     # down (rather than just counting one session).

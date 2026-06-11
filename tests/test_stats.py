@@ -357,3 +357,51 @@ def test_top_cost_sessions_truncated_to_five_and_ordered():
     assert len(p.top_cost_sessions) == 5
     costs = [s["est_cost_usd"] for s in p.top_cost_sessions]
     assert costs == sorted(costs, reverse=True)
+def test_compute_extended_profile_aggregates_actual_usage():
+    sessions = [
+        _sf(
+            session_id="actual-1",
+            actual_input_tokens=100,
+            actual_output_tokens=20,
+            actual_cache_read_tokens=300,
+            actual_cache_write_tokens=40,
+            actual_reasoning_tokens=5,
+            actual_total_tokens=460,
+            actual_cost_usd=0.25,
+            premium_requests=1.5,
+            nano_aiu=1000,
+            has_actual_usage=True,
+        ),
+        _sf(
+            session_id="estimate-only",
+            est_total_tokens=999,
+            has_actual_usage=False,
+        ),
+        _sf(
+            session_id="actual-2",
+            actual_input_tokens=10,
+            actual_output_tokens=2,
+            actual_cache_read_tokens=30,
+            actual_cache_write_tokens=4,
+            actual_reasoning_tokens=1,
+            actual_total_tokens=46,
+            actual_cost_usd=None,
+            premium_requests=0.5,
+            nano_aiu=2000,
+            has_actual_usage=True,
+        ),
+    ]
+
+    p = compute_extended_profile(sessions)
+
+    assert p.actual_input_tokens == 110
+    assert p.actual_output_tokens == 22
+    assert p.actual_cache_read_tokens == 330
+    assert p.actual_cache_write_tokens == 44
+    assert p.actual_reasoning_tokens == 6
+    assert p.actual_total_tokens == 506
+    assert p.actual_cost_usd == pytest.approx(0.25)
+    assert p.total_premium_requests == pytest.approx(2.0)
+    assert p.total_nano_aiu == 3000
+    assert p.sessions_with_actual_usage == 2
+

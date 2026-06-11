@@ -16,7 +16,8 @@ from aianalyzer.features import SessionFeatures
 # v9: first_words preserves apostrophes ("let's" instead of "lets").
 # v10: token economy (Phase F) — est_input_tokens, est_output_tokens,
 #      est_total_tokens, est_cost_usd, priced_token_share.
-SCHEMA_VERSION = 10
+# v11: Phase H — billed token accounting (actual_*, premium_requests, nano_aiu).
+SCHEMA_VERSION = 11
 
 
 class FeatureStore:
