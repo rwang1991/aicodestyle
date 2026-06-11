@@ -17,7 +17,9 @@ from aianalyzer.features import SessionFeatures
 # v10: token economy (Phase F) — est_input_tokens, est_output_tokens,
 #      est_total_tokens, est_cost_usd, priced_token_share.
 # v11: Phase H — billed token accounting (actual_*, premium_requests, nano_aiu).
-SCHEMA_VERSION = 11
+# v12: Phase H bug fix — input_tokens semantics changed from "aggregate (incl.
+#      cache pools)" to "uncached only", so cached features from v11 are wrong.
+SCHEMA_VERSION = 12
 
 
 class FeatureStore:
