@@ -25,6 +25,18 @@ class AssistantMessage(BaseModel):
     ts: datetime
 
 
+class UsageRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+    requests: int = 0
+    premium_requests: float = 0.0
+    nano_aiu: int = 0
+
+
 class ToolCall(BaseModel):
     model_config = ConfigDict(frozen=True)
     tool_name: str
@@ -65,3 +77,6 @@ class NormalizedSession(BaseModel):
     turns: list[Turn] = Field(default_factory=list)
     todos: list[TodoSnapshot] = Field(default_factory=list)
     raw_mtime: float = 0.0
+    actual_usage: Optional[UsageRecord] = None
+    actual_usage_by_model: dict[str, UsageRecord] = Field(default_factory=dict)
+

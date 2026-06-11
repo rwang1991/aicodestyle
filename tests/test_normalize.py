@@ -60,3 +60,18 @@ def test_turn_rejects_negative_index():
 
     with pytest.raises(ValidationError):
         Turn(index=-1, user=None, assistant=None, tool_calls=[], aborted=False)
+def test_normalized_session_usage_defaults_are_empty():
+    from datetime import datetime, timezone
+
+    from aianalyzer.normalize import NormalizedSession
+
+    session = NormalizedSession(
+        client="copilot-cli",
+        session_id="s-defaults",
+        started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        ended_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+    assert session.actual_usage is None
+    assert session.actual_usage_by_model == {}
+
