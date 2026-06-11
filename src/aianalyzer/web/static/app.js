@@ -986,6 +986,14 @@
             toast(`Scanned ${total} session${total === 1 ? "" : "s"} (new ${fresh}) — ${breakdown}`, "info");
           }
           await load();
+          // After a scan with at least one session, kick off the AI Profile
+          // narrative automatically so users don't have to remember to click
+          // "Generate AI profile". Don't await — let it run in the background
+          // so the scan button returns to idle and the rest of the page is
+          // interactive while Copilot CLI thinks (1–3 min).
+          if (total > 0 && typeof runNarrative === "function") {
+            runNarrative();
+          }
         }
       } catch (e) {
         toast(`Scan request failed: ${e.message}`);
@@ -995,12 +1003,23 @@
     });
   }
 
+  // Module-level so wireScan can trigger the narrative after a successful scan
+  // without going through the DOM. Set by wireNarrative() once buttons are
+  // wired; remains a no-op if those buttons don't exist on the page.
+  let runNarrative = null;
+
   async function wireNarrative() {
     const buttons = [$("#narrate-btn"), $("#narrate-btn-inline")].filter(Boolean);
     if (!buttons.length) return;
     const section = $("#narrative-section");
 
-    const run = async () => {
+    let inFlight = false;
+    runNarrative = async () => {
+      // Guard against double-invocations: scan auto-trigger + an impatient
+      // user clicking "Regenerate" would otherwise launch two Copilot
+      // subprocesses.
+      if (inFlight) return;
+      inFlight = true;
       const status = $("#narrative-status");
       // Section is now always visible; just refresh in-place.
       section.classList.remove("hidden");
@@ -1014,7 +1033,20 @@
           status.textContent = `Generating narrative (${j.status})…`;
         });
         if (final.status === "failed") {
-          status.textContent = `Narrative failed: ${final.error}`;
+          const err = String(final.error || "");
+          // Friendly degradation when the local Copilot CLI binary is missing
+          // — surfacing the raw "copilot CLI binary not found on PATH" error
+          // would scare non-technical users. Note: NarrativeError prefixes
+          // with class name, so we substring-match the message body.
+          if (/copilot CLI binary not found/i.test(err)) {
+            status.innerHTML =
+              `<b>GitHub Copilot CLI is not installed locally</b> — skipping the ` +
+              `AI Profile narrative. ` +
+              `<a href="https://docs.github.com/copilot/github-copilot-in-the-cli" target="_blank" rel="noopener">Install Copilot CLI</a> ` +
+              `and rescan to enable this section.`;
+          } else {
+            status.textContent = `Narrative failed: ${err}`;
+          }
         } else {
           status.textContent = "";
           $("#narrative-md").innerHTML = window.marked.parse(final.result.markdown);
@@ -1024,10 +1056,11 @@
       } finally {
         for (const b of buttons) b.disabled = false;
         section.classList.remove("loading");
+        inFlight = false;
       }
     };
 
-    for (const btn of buttons) btn.addEventListener("click", run);
+    for (const btn of buttons) btn.addEventListener("click", () => runNarrative());
   }
 
   async function wireExportHtml() {
