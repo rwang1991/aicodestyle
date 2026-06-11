@@ -428,9 +428,28 @@ def test_aggregator_returns_top_n_sorted():
     assert len(rep.tips) <= 6
     win_count = sum(1 for t in rep.tips if t.severity == Severity.WIN)
     assert win_count <= 2
+    # Lock in within-severity ordering by impact descending.
+    assert rep.tips[0].rule_id == "A3"  # heads_up, impact 0.7
+    assert rep.tips[1].rule_id == "D3"  # heads_up, impact 0.5
 
 
-def test_aggregator_dedups_and_handles_empty():
+def test_aggregator_win_cap_enforced_when_many_wins_emit():
+    # Profile crafted to fire ONLY win rules (B3 + C3 + E2) — no heads_up,
+    # no tips compete for the 6 slots, so the cap of 2 is exercised.
+    p = _profile_with(
+        total_sessions=25,
+        avg_turns_per_session=15,  # < 30, D1 skips
+        median_prompt_words=70,    # B3 win
+        top_models=[("a", 400), ("b", 300), ("c", 300)],  # E2 win (0.40 share)
+        by_client={"copilot-cli": {"sessions": 25}},      # < 50, F1 skips
+    )
+    fs = _features_with_agency([0.7] * 25)  # C3 win (30% hands-on)
+    rep = compute_coach_report(p, fs)
+    win_count = sum(1 for t in rep.tips if t.severity == Severity.WIN)
+    assert win_count == 2  # cap hit (3 emitted, 2 kept)
+
+
+def test_aggregator_handles_empty():
     p = _empty_profile()
     rep = compute_coach_report(p, [])
     assert rep.tips == []
