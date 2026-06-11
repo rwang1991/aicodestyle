@@ -328,6 +328,29 @@
     document.getElementById("tok-priced").textContent =
       pricedPct > 0 ? `${pricedPct}% of tokens are on priced models` : "All models are unpriced / proprietary";
 
+    const hasBilled = !!te.has_billed_data;
+    const sourceLabel = document.getElementById("tok-source-label");
+    if (sourceLabel) {
+      sourceLabel.textContent = hasBilled ? "(billed)" : "(tiktoken estimate)";
+    }
+
+    if (hasBilled) {
+      document.getElementById("tok-total").textContent = _formatTokens(te.actual_total_tokens);
+      document.getElementById("tok-io").textContent =
+        `${_formatTokens(te.actual_input_tokens)} in · ${_formatTokens(te.actual_output_tokens)} out`;
+      document.getElementById("tok-cost").textContent = `$${(te.actual_cost_usd || 0).toFixed(2)}`;
+
+      document.getElementById("tok-premium").textContent =
+        (te.total_premium_requests || 0).toFixed(1);
+      document.getElementById("tok-cache-read").textContent = _formatTokens(te.actual_cache_read_tokens);
+      document.getElementById("tok-cache-write").textContent = _formatTokens(te.actual_cache_write_tokens);
+      document.getElementById("tok-billed-sessions").textContent =
+        `${te.sessions_with_actual_usage} / ${sessionCount}`;
+      document.querySelectorAll(".token-stat-billed").forEach(el => el.style.display = "");
+    } else {
+      document.querySelectorAll(".token-stat-billed").forEach(el => el.style.display = "none");
+    }
+
     const ratio = te.output_to_input_ratio || 0;
     document.getElementById("tok-ratio").textContent = ratio > 0 ? ratio.toFixed(2) + "×" : "—";
     let style = "—";

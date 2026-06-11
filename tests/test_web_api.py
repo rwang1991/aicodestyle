@@ -263,6 +263,8 @@ def test_profile_includes_coach_block(tmp_path, monkeypatch):
 
     p = client.get("/api/profile").json()
     assert "coach" in p
+    assert "has_billed_data" in p["token_economy"]
+    assert "total_premium_requests" in p["token_economy"]
     coach = p["coach"]
     assert "score" in coach and 0 <= coach["score"] <= 100
     assert coach["band"] in {"Apprentice", "Practitioner", "Operator", "Conductor"}

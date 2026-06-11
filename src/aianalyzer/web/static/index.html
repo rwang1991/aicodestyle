@@ -171,13 +171,13 @@
 
     <section id="token-card" class="card token-card hidden">
       <header class="token-card-header">
-        <h3>Token economy <span class="unit">(tiktoken estimate)</span></h3>
+        <h3>Token economy <span class="unit" id="tok-source-label">(tiktoken estimate)</span></h3>
         <p class="card-sub">
-          Token counts and USD cost are estimated offline with the
-          <code>cl100k_base</code> tokenizer (±5% on natural-language text)
-          and a curated 2026 list-price table. Sessions that ran on
-          proprietary / unpriced models contribute to token totals but not
-          to the dollar figure.
+          When your session source records real billed numbers (Copilot CLI's
+          <code>session.shutdown</code> event), we use those directly. For
+          older sessions or other clients without billing events, we estimate
+          offline with the <code>cl100k_base</code> tokenizer (±5% on text
+          but undercounts cached history and system prompts).
         </p>
       </header>
       <div class="token-stats">
@@ -200,6 +200,26 @@
           <div class="token-stat-label">Pareto (sessions for 80%)</div>
           <div class="token-stat-value" id="tok-pareto">—</div>
           <div class="token-stat-sub" id="tok-pareto-sub">—</div>
+        </div>
+        <div class="token-stat token-stat-billed">
+          <div class="token-stat-label">Premium requests</div>
+          <div class="token-stat-value" id="tok-premium">—</div>
+          <div class="token-stat-sub" id="tok-premium-sub">matches your Power BI billing</div>
+        </div>
+        <div class="token-stat token-stat-billed">
+          <div class="token-stat-label">Cache read tokens</div>
+          <div class="token-stat-value" id="tok-cache-read">—</div>
+          <div class="token-stat-sub">discounted by your provider</div>
+        </div>
+        <div class="token-stat token-stat-billed">
+          <div class="token-stat-label">Cache write tokens</div>
+          <div class="token-stat-value" id="tok-cache-write">—</div>
+          <div class="token-stat-sub">full rate, reused next turn</div>
+        </div>
+        <div class="token-stat token-stat-billed">
+          <div class="token-stat-label">Billed sessions</div>
+          <div class="token-stat-value" id="tok-billed-sessions">—</div>
+          <div class="token-stat-sub" id="tok-billed-sessions-sub">have real usage data</div>
         </div>
       </div>
       <div class="token-top-sessions">
