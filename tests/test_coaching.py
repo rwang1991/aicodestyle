@@ -48,3 +48,122 @@ def test_empty_profile_returns_empty_tips_and_low_score():
     assert rep.tips == []
     assert 0 <= rep.score <= 100
     assert rep.band in {"Apprentice", "Practitioner", "Operator", "Conductor"}
+
+
+def _profile_with(**overrides) -> ExtendedProfile:
+    p = _empty_profile()
+    for k, v in overrides.items():
+        setattr(p, k, v)
+    return p
+
+
+def _tip_with_id(rep_or_tips, rule_id):
+    tips = rep_or_tips.tips if hasattr(rep_or_tips, "tips") else rep_or_tips
+    for t in tips:
+        if t.rule_id == rule_id:
+            return t
+    return None
+
+
+def test_rule_a1_output_input_ratio_high():
+    from aianalyzer.coaching import _rule_a1_output_input_high
+    p = _profile_with(output_to_input_ratio=3.5, total_sessions=20)
+    tip = _rule_a1_output_input_high(p, [])
+    assert tip is not None
+    assert tip.rule_id == "A1"
+    assert tip.severity == Severity.TIP
+    assert "3.5" in tip.body or "3.5x" in tip.body or "Output is 3.5×" in tip.body
+
+
+def test_rule_a1_does_not_fire_when_ratio_balanced():
+    from aianalyzer.coaching import _rule_a1_output_input_high
+    p = _profile_with(output_to_input_ratio=2.0, total_sessions=20)
+    assert _rule_a1_output_input_high(p, []) is None
+
+
+def test_rule_a2_output_input_ratio_low():
+    from aianalyzer.coaching import _rule_a2_output_input_low
+    p = _profile_with(output_to_input_ratio=0.3, total_sessions=15)
+    tip = _rule_a2_output_input_low(p, [])
+    assert tip is not None
+    assert tip.rule_id == "A2"
+
+
+def test_rule_a2_skips_when_too_few_sessions():
+    from aianalyzer.coaching import _rule_a2_output_input_low
+    p = _profile_with(output_to_input_ratio=0.3, total_sessions=5)
+    assert _rule_a2_output_input_low(p, []) is None
+
+
+def test_rule_a3_pareto_concentrated():
+    from aianalyzer.coaching import _rule_a3_pareto_concentrated
+    p = _profile_with(
+        total_sessions=100,
+        sessions_for_80pct_tokens=8,
+        est_total_tokens=1_000_000,
+    )
+    tip = _rule_a3_pareto_concentrated(p, [])
+    assert tip is not None
+    assert tip.severity == Severity.HEADS_UP
+
+
+def test_rule_a3_does_not_fire_when_even():
+    from aianalyzer.coaching import _rule_a3_pareto_concentrated
+    p = _profile_with(
+        total_sessions=100,
+        sessions_for_80pct_tokens=40,
+        est_total_tokens=1_000_000,
+    )
+    assert _rule_a3_pareto_concentrated(p, []) is None
+
+
+def test_rule_a4_expensive_session():
+    from aianalyzer.coaching import _rule_a4_expensive_session
+    p = _profile_with(top_cost_sessions=[
+        {"session_id": "x", "est_cost_usd": 7.21, "est_total_tokens": 180_000},
+    ])
+    tip = _rule_a4_expensive_session(p, [])
+    assert tip is not None
+    assert "$7.21" in tip.body
+
+
+def test_rule_a4_skips_under_threshold():
+    from aianalyzer.coaching import _rule_a4_expensive_session
+    p = _profile_with(top_cost_sessions=[
+        {"session_id": "x", "est_cost_usd": 2.10, "est_total_tokens": 50_000},
+    ])
+    assert _rule_a4_expensive_session(p, []) is None
+
+
+def test_rule_a5_unpriced_share_high():
+    from aianalyzer.coaching import _rule_a5_unpriced_share
+    p = _profile_with(priced_token_share=0.70, est_total_tokens=500_000)
+    tip = _rule_a5_unpriced_share(p, [])
+    assert tip is not None
+    assert "30" in tip.body or "30%" in tip.body  # 1 - 0.70 = 30%
+
+
+def test_rule_a5_skips_when_priced_share_high():
+    from aianalyzer.coaching import _rule_a5_unpriced_share
+    p = _profile_with(priced_token_share=0.95, est_total_tokens=500_000)
+    assert _rule_a5_unpriced_share(p, []) is None
+
+
+def test_rule_a6_premium_on_short_sessions():
+    from aianalyzer.coaching import _rule_a6_premium_for_quick
+    p = _profile_with(
+         model_tier_counts={"Premium": 80, "Standard": 10, "Fast": 5},
+        avg_turns_per_session=3.0,
+    )
+    tip = _rule_a6_premium_for_quick(p, [])
+    assert tip is not None
+    assert tip.rule_id == "A6"
+
+
+def test_rule_a6_skips_when_balanced_use():
+    from aianalyzer.coaching import _rule_a6_premium_for_quick
+    p = _profile_with(
+        model_tier_counts={"Premium": 30, "Standard": 50, "Fast": 20},
+        avg_turns_per_session=12.0,
+    )
+    assert _rule_a6_premium_for_quick(p, []) is None
