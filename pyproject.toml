@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aicodestyle"
-version = "0.1.1"
+version = "0.1.2"
 description = "AICodeStyle — local-first analyzer that reveals how you actually use AI coding assistants."
 readme = "README.md"
 requires-python = ">=3.11"
