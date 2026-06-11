@@ -350,3 +350,63 @@ def test_rule_d3_skips_when_balanced():
     p = _profile_with(total_sessions=20)
     fs = _features_with_start_hour([10, 14, 16, 22] * 5)
     assert _rule_d3_late_night(p, fs) is None
+
+
+def test_rule_e1_single_model_dominance():
+    from aianalyzer.coaching import _rule_e1_single_model
+    p = _profile_with(
+        total_sessions=40,
+        top_models=[("claude-sonnet-4.5", 920), ("gpt-5", 50), ("haiku", 30)],
+    )
+    tip = _rule_e1_single_model(p, [])
+    assert tip is not None
+    assert "claude-sonnet-4.5" in tip.body
+
+
+def test_rule_e1_skips_balanced():
+    from aianalyzer.coaching import _rule_e1_single_model
+    p = _profile_with(
+        total_sessions=40,
+        top_models=[("claude-sonnet-4.5", 500), ("gpt-5", 350), ("haiku", 150)],
+    )
+    assert _rule_e1_single_model(p, []) is None
+
+
+def test_rule_e2_smart_juggling_win():
+    from aianalyzer.coaching import _rule_e2_smart_juggling
+    p = _profile_with(
+        total_sessions=40,
+        top_models=[("a", 400), ("b", 350), ("c", 250)],
+    )
+    tip = _rule_e2_smart_juggling(p, [])
+    assert tip is not None
+    assert tip.severity == Severity.WIN
+
+
+def test_rule_e2_skips_when_dominant_model():
+    from aianalyzer.coaching import _rule_e2_smart_juggling
+    p = _profile_with(
+        total_sessions=40,
+        top_models=[("a", 900), ("b", 50), ("c", 50)],
+    )
+    assert _rule_e2_smart_juggling(p, []) is None
+
+
+def test_rule_f1_single_client():
+    from aianalyzer.coaching import _rule_f1_single_client
+    p = _profile_with(
+        total_sessions=100,
+        by_client={"copilot-cli": {"sessions": 95}, "vscode": {"sessions": 5}},
+    )
+    tip = _rule_f1_single_client(p, [])
+    assert tip is not None
+    assert "copilot-cli" in tip.body
+
+
+def test_rule_f1_skips_when_small_sample():
+    from aianalyzer.coaching import _rule_f1_single_client
+    p = _profile_with(
+        total_sessions=10,
+        by_client={"copilot-cli": {"sessions": 10}},
+    )
+    assert _rule_f1_single_client(p, []) is None

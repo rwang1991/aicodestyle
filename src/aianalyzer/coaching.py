@@ -388,6 +388,114 @@ def _rule_d3_late_night(p, features):
     )
 
 
+# --- Category E: model selection ------------------------------------------
+
+_OTHER_MODEL_HINT = {
+    "claude": "GPT-5 for code review tasks",
+    "gpt": "Claude for long-context reasoning",
+    "gemini": "Claude or GPT-5 for code generation",
+}
+
+
+def _other_model_suggestion(top_model: str) -> str:
+    lower = top_model.lower()
+    for needle, suggestion in _OTHER_MODEL_HINT.items():
+        if needle in lower:
+            return suggestion
+    return "a different reasoning model for hard tasks"
+
+
+def _rule_e1_single_model(p, features):
+    if p.total_sessions < 30 or not p.top_models:
+        return None
+    total = sum(c for _, c in p.top_models)
+    if total == 0:
+        return None
+    top_name, top_count = p.top_models[0]
+    share = top_count / total
+    if share <= 0.90:
+        return None
+    suggestion = _other_model_suggestion(top_name)
+    return CoachTip(
+        rule_id="E1",
+        severity=Severity.TIP,
+        category="model",
+        headline=f"You use {top_name} for almost everything",
+        body=(
+            f"{share*100:.0f}% of turns go to {top_name}. Try {suggestion} — "
+            "different model families have meaningfully different strengths."
+        ),
+        impact_estimate=0.3,
+        evidence={"top_model": top_name, "share": share},
+    )
+
+
+def _rule_e2_smart_juggling(p, features):
+    if p.total_sessions < 20 or len(p.top_models) < 3:
+        return None
+    total = sum(c for _, c in p.top_models)
+    if total == 0:
+        return None
+    top_share = p.top_models[0][1] / total
+    if top_share > 0.70:
+        return None
+    return CoachTip(
+        rule_id="E2",
+        severity=Severity.WIN,
+        category="model",
+        headline="Smart model juggling",
+        body=(
+            f"You spread work across {len(p.top_models)} models with no single one "
+            "above 70%. That's the mark of someone matching the model to the task."
+        ),
+        impact_estimate=0.1,
+        evidence={"model_count": len(p.top_models)},
+    )
+
+
+# --- Category F: tool / client diversity ----------------------------------
+
+_OTHER_CLIENT_HINT = {
+    "copilot-cli": "VS Code Copilot inline for quick edits",
+    "vscode": "Copilot CLI for batch / scripted work",
+    "claude": "Copilot CLI or VS Code for IDE-integrated tasks",
+}
+
+
+def _other_client_suggestion(top_client: str) -> str:
+    lower = top_client.lower()
+    for needle, suggestion in _OTHER_CLIENT_HINT.items():
+        if needle in lower:
+            return suggestion
+    return "another client for variety"
+
+
+def _rule_f1_single_client(p, features):
+    if p.total_sessions < 50 or not p.by_client:
+        return None
+    items = [(name, info.get("sessions", 0)) for name, info in p.by_client.items()]
+    items.sort(key=lambda x: x[1], reverse=True)
+    total = sum(c for _, c in items)
+    if total == 0:
+        return None
+    top_name, top_count = items[0]
+    share = top_count / total
+    if share <= 0.90:
+        return None
+    return CoachTip(
+        rule_id="F1",
+        severity=Severity.TIP,
+        category="tool",
+        headline=f"All your AI work lives in {top_name}",
+        body=(
+            f"{share*100:.0f}% of your sessions are on {top_name}. "
+            f"Try {_other_client_suggestion(top_name)} — different surfaces fit different tasks."
+        ),
+        impact_estimate=0.3,
+        evidence={"top_client": top_name, "share": share},
+    )
+
+
 def compute_coach_report(
     profile: ExtendedProfile,
     features: Iterable[SessionFeatures],
