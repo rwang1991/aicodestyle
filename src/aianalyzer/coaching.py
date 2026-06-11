@@ -496,9 +496,65 @@ def _rule_f1_single_client(p, features):
     )
 
 
+_RULES = [
+    _rule_a1_output_input_high,
+    _rule_a2_output_input_low,
+    _rule_a3_pareto_concentrated,
+    _rule_a4_expensive_session,
+    _rule_a5_unpriced_share,
+    _rule_a6_premium_for_quick,
+    _rule_b1_short_prompts,
+    _rule_b2_overspecify,
+    _rule_b3_sweet_spot,
+    _rule_c1_hands_off,
+    _rule_c2_micromanage,
+    _rule_c3_balance_win,
+    _rule_d1_long_loops,
+    _rule_d2_long_sessions,
+    _rule_d3_late_night,
+    _rule_e1_single_model,
+    _rule_e2_smart_juggling,
+    _rule_f1_single_client,
+]
+
+
+_MAX_TIPS = 6
+_MAX_WINS = 2
+
+
 def compute_coach_report(
     profile: ExtendedProfile,
     features: Iterable[SessionFeatures],
 ) -> CoachReport:
-    """Public entry point. Returns the full coach report."""
-    return CoachReport()
+    feats = list(features)
+    emitted: list[CoachTip] = []
+    for rule in _RULES:
+        try:
+            tip = rule(profile, feats)
+        except Exception:  # noqa: BLE001 — never let one bad rule kill the page
+            tip = None
+        if tip is not None:
+            emitted.append(tip)
+    emitted.sort(
+        key=lambda t: (SEVERITY_PRIORITY[t.severity], t.impact_estimate),
+        reverse=True,
+    )
+
+    selected: list[CoachTip] = []
+    wins = 0
+    for tip in emitted:
+        if tip.severity == Severity.WIN:
+            if wins >= _MAX_WINS:
+                continue
+            wins += 1
+        selected.append(tip)
+        if len(selected) >= _MAX_TIPS:
+            break
+
+    score, band, subs = _efficiency_score(profile, feats)
+    return CoachReport(score=score, band=band, sub_scores=subs, tips=selected)
+
+
+def _efficiency_score(profile, features):
+    """Placeholder until Task 8 lands the real composite."""
+    return 0, "Apprentice", {}

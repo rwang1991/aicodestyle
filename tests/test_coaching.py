@@ -410,3 +410,28 @@ def test_rule_f1_skips_when_small_sample():
         by_client={"copilot-cli": {"sessions": 10}},
     )
     assert _rule_f1_single_client(p, []) is None
+
+
+def test_aggregator_returns_top_n_sorted():
+    p = _profile_with(
+        total_sessions=100,
+        avg_turns_per_session=42,
+        output_to_input_ratio=4.0,
+        sessions_for_80pct_tokens=5,
+        median_prompt_words=70,
+        top_models=[("a", 950), ("b", 30), ("c", 20)],
+        by_client={"copilot-cli": {"sessions": 100}},
+    )
+    fs = _features_with_agency([0.7] * 100)
+    rep = compute_coach_report(p, fs)
+    assert rep.tips[0].severity == Severity.HEADS_UP
+    assert len(rep.tips) <= 6
+    win_count = sum(1 for t in rep.tips if t.severity == Severity.WIN)
+    assert win_count <= 2
+
+
+def test_aggregator_dedups_and_handles_empty():
+    p = _empty_profile()
+    rep = compute_coach_report(p, [])
+    assert rep.tips == []
+    assert 0 <= rep.score <= 100
