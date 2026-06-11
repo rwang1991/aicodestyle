@@ -458,11 +458,12 @@
   function renderHero(p) {
     const primary = (p.primary_archetype || "unknown").replace(/^./, c => c.toUpperCase());
     $("#hero-archetype").textContent = `You are an ${primary}`;
-    const conf = Math.round((p.confidence || 0) * 100);
     const eb = $(".hero-eyebrow");
     if (eb) eb.textContent = p.macro_label || "Your AI archetype";
+    const leanLabel = p.archetype_lean_label || "";
+    const prefix = leanLabel ? `${leanLabel} · ` : "";
     $("#hero-summary").textContent =
-      `${conf}% confidence · ${p.totals.sessions} sessions · ` +
+      `${prefix}${p.totals.sessions} sessions · ` +
       `${p.totals.turns} turns · ${pretty(p.totals.hours)}h engaged with AI.`;
 
     const tagsEl = $("#hero-tags");

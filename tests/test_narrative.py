@@ -14,7 +14,8 @@ def _facts():
     return {
         "primary_archetype": Archetype.ARCHITECT.value,
         "secondary_archetype": Archetype.PILOT.value,
-        "confidence": 0.78,
+        "archetype_lean": 0.78,
+        "archetype_lean_label": "Strong Architect tendency",
         "axes": {"planning": 0.32, "control": 0.37, "depth": 0.05, "speed": -0.10},
         "totals": {"sessions": 168, "turns": 1820, "hours": 92.4, "days_active": 41},
         "top_tools": [("edit", 220), ("read", 180)],

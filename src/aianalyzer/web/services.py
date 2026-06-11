@@ -74,9 +74,27 @@ def _cache_path() -> Path:
     return base / "cache.duckdb"
 
 
-def _confidence(planning: float, control: float) -> float:
-    """Bounded heuristic: stronger axis magnitudes => higher confidence."""
+def _archetype_lean(planning: float, control: float) -> float:
+    """How far the user sits from the dead center of the (planning, control)
+    plane. 0 = perfectly balanced across all four archetypes, 1 = at the
+    extreme corner of one archetype. This is NOT statistical confidence in
+    the data — even a user with thousands of sessions can sit at the
+    center if their style is genuinely balanced."""
     return min(1.0, (abs(planning) + abs(control)) / 2.0)
+
+
+def _archetype_lean_label(lean: float, primary: str) -> str:
+    """Translate the numeric lean into a phrase that doesn't sound like
+    statistical uncertainty. The phrasing reinforces the already-displayed
+    primary archetype name."""
+    pretty = primary.replace("_", " ").title() if primary else "this archetype"
+    if lean >= 0.50:
+        return f"Strong {pretty} tendency"
+    if lean >= 0.25:
+        return f"Clear {pretty} tilt"
+    if lean >= 0.10:
+        return f"Mild {pretty} lean"
+    return "Balanced style — close to the center of all four archetypes"
 
 
 # Six independent traits that produce a real radar shape (unlike projecting
@@ -281,14 +299,19 @@ def load_profile_payload() -> dict[str, Any]:
     classification = classify(user_profile)
     ext = compute_extended_profile(features)
 
+    primary_value = classification.primary.value
+    lean_value = round(
+        _archetype_lean(classification.planning_score, classification.control_score), 3
+    )
     return {
-        "primary_archetype": classification.primary.value,
+        "primary_archetype": primary_value,
         "secondary_archetype": (
             classification.secondary.value if classification.secondary else None
         ),
         "macro_label": classification.macro_label,
         "tags": list(classification.tags),
-        "confidence": round(_confidence(classification.planning_score, classification.control_score), 3),
+        "archetype_lean": lean_value,
+        "archetype_lean_label": _archetype_lean_label(lean_value, primary_value),
         "axes": {
             "planning": round(classification.planning_score, 3),
             "control": round(classification.control_score, 3),
