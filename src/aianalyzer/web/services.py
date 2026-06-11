@@ -214,6 +214,18 @@ def _serialize_coach_report(report) -> dict:
     }
 
 
+def _safe_coach_payload(ext, features) -> dict:
+    """Build the coach payload, never failing the whole profile response.
+
+    Aggregator already isolates per-rule exceptions (coaching._RULES loop).
+    This wrapper is belt-and-suspenders for shape/serialization errors.
+    """
+    try:
+        return _serialize_coach_report(compute_coach_report(ext, features))
+    except Exception:  # noqa: BLE001 — coach must never 500 /api/profile
+        return {"score": 0, "band": "Apprentice", "sub_scores": {}, "tips": []}
+
+
 def run_scan(progress_cb=None) -> dict[str, Any]:
     """Discover -> normalize -> extract -> cache. Returns counts and per-client breakdown."""
     store = FeatureStore(_cache_path())
@@ -320,7 +332,7 @@ def load_profile_payload() -> dict[str, Any]:
             "sessions_for_80pct_tokens": ext.sessions_for_80pct_tokens,
             "top_cost_sessions": ext.top_cost_sessions,
         },
-        "coach": _serialize_coach_report(compute_coach_report(ext, features)),
+        "coach": _safe_coach_payload(ext, features),
         "activity_per_day_last_90": ext.activity_per_day_last_90,
         "by_client": ext.by_client,
         "first_session_at": ext.first_session_at.isoformat() if ext.first_session_at else None,
