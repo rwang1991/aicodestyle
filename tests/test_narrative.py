@@ -52,15 +52,27 @@ def test_generate_narrative_invokes_copilot_with_expected_args(monkeypatch):
     assert out.startswith("# Your AI Profile")
     assert captured["cmd"][0] == "copilot"
     assert "-p" in captured["cmd"]
-    assert "--allow-all-tools" in captured["cmd"]
+    # We MUST NOT pass --allow-all-tools: the narrative is a pure text task,
+    # and giving the CLI tool access caused it to write a stray profile.md
+    # to the user's cwd and then short-circuit subsequent runs with
+    # "the file already exists" instead of returning markdown.
+    assert "--allow-all-tools" not in captured["cmd"]
     assert "--no-color" in captured["cmd"]
     assert "-s" in captured["cmd"]
     assert "--output-format" in captured["cmd"]
     assert "text" in captured["cmd"]
+    # The prompt must explicitly forbid file writes and tool use so the model
+    # emits markdown to stdout instead of side-effecting the filesystem.
+    prompt_idx = captured["cmd"].index("-p") + 1
+    prompt_text = captured["cmd"][prompt_idx]
+    assert "do NOT write" in prompt_text.lower() or "do not write" in prompt_text.lower()
     # Critical for Windows: subprocess must decode as UTF-8 with replace so
     # we never produce mojibake from the OS code page (e.g. cp1252 / cp936).
     assert captured["kwargs"].get("encoding") == "utf-8"
     assert captured["kwargs"].get("errors") == "replace"
+    # Must run in an isolated cwd so any stray tool-driven file writes do not
+    # pollute the user's working directory.
+    assert captured["kwargs"].get("cwd") is not None
 
 
 def test_generate_narrative_raises_on_nonzero_exit(monkeypatch):

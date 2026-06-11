@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from typing import Any
 
 
@@ -15,7 +16,16 @@ You are writing an "AI Collaboration Profile" for a developer based on aggregate
 anonymised statistics from their local AI coding sessions. Do NOT invent any facts —
 only use the JSON below.
 
-Write the profile in **Markdown** with these sections, in this order:
+**Output requirements (strict):**
+- Print the Markdown profile directly to stdout. Your entire response must be the
+  Markdown content itself — nothing before it, nothing after it.
+- Do NOT call any tools. Do NOT write or read any files. In particular,
+  do NOT create or modify a `profile.md` file. The caller captures your stdout
+  and renders it inline in a web UI; any file you create is wasted I/O.
+- Do NOT preface the answer with status text like "Here is the profile" or
+  "The file has been written". Just output the Markdown.
+
+The Markdown must have these sections, in this order:
 
 1. `# Your AI Profile` — a one-paragraph headline summary that names the primary
    archetype and the dominant collaboration style in plain language.
@@ -49,12 +59,16 @@ def generate_narrative(
     """Invoke the Copilot CLI to produce a Markdown narrative.
 
     Raises NarrativeError if the binary is missing, exits non-zero, or times out.
+
+    The subprocess runs in an isolated temp directory and is NOT given
+    ``--allow-all-tools``, so even if the model decides to invoke a file-write
+    tool it cannot pollute the user's working directory (e.g. dropping a
+    stray ``profile.md`` next to the .exe).
     """
     prompt = build_narrative_prompt(facts)
     cmd = [
         copilot_binary,
         "-p", prompt,
-        "--allow-all-tools",
         "--no-color",
         "-s",
         "--output-format", "text",
@@ -65,15 +79,17 @@ def generate_narrative(
         # CJK characters that the Copilot CLI emits as UTF-8. Force UTF-8 and
         # replace any malformed sequences so we never propagate mojibake to
         # the portal.
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_sec,
-            check=False,
-        )
+        with tempfile.TemporaryDirectory(prefix="aicodestyle-narrative-") as tmp:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout_sec,
+                check=False,
+                cwd=tmp,
+            )
     except subprocess.TimeoutExpired as e:
         raise NarrativeError(f"copilot CLI timed out after {timeout_sec}s") from e
     except FileNotFoundError as e:
@@ -86,3 +102,4 @@ def generate_narrative(
             f"copilot CLI exited {proc.returncode}: {proc.stderr.strip()[:500]}"
         )
     return proc.stdout
+
